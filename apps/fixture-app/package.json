@@ -1,0 +1,13 @@
+{
+  "name": "@sga/fixture-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "fastify": "^5.12.1",
+    "zod": "^4.4.3"
+  }
+}

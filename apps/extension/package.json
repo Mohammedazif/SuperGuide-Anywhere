@@ -1,0 +1,22 @@
+{
+  "name": "@sga/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@sga/adapters": "workspace:*",
+    "@sga/contract": "workspace:*",
+    "@sga/executor": "workspace:*",
+    "@sga/observer": "workspace:*",
+    "@sga/policy": "workspace:*",
+    "@sga/transport": "workspace:*",
+    "@sga/ui": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "tsup": "^8.5.1"
+  }
+}

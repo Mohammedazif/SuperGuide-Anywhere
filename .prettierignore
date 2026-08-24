@@ -1,0 +1,8 @@
+dist/
+node_modules/
+.pgdata/
+coverage/
+eval/results/
+test-results/
+playwright-report/
+pnpm-lock.yaml

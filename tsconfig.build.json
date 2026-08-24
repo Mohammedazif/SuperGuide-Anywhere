@@ -1,0 +1,16 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/contract" },
+    { "path": "packages/policy" },
+    { "path": "packages/adapters" },
+    { "path": "packages/observer" },
+    { "path": "packages/executor" },
+    { "path": "packages/transport" },
+    { "path": "packages/ui" },
+    { "path": "apps/extension" },
+    { "path": "apps/control-plane" },
+    { "path": "apps/fixture-app" },
+    { "path": "eval/harness" }
+  ]
+}

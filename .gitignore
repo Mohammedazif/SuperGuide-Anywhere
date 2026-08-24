@@ -1,0 +1,17 @@
+coverage/
+dist/
+dist-tsc/
+.env
+.env.local
+eval/results/
+node_modules/
+.pgdata/
+.pginitpw
+playwright-report/
+**/src/**/*.d.ts
+**/src/**/*.d.ts.map
+**/src/**/*.js
+**/src/**/*.js.map
+test-results/
+*.tsbuildinfo
+store-package/

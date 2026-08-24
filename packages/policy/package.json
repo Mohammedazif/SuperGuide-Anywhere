@@ -1,0 +1,19 @@
+{
+  "name": "@sga/policy",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@sga/contract": "workspace:*",
+    "zod": "^4.4.3"
+  }
+}

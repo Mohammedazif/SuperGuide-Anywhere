@@ -1,0 +1,22 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      # Typed linting resolves types across workspace packages, so it needs the emitted
+      # declarations. typecheck runs tsc -b, which produces them, before lint runs.
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+      - run: pnpm check:forbidden

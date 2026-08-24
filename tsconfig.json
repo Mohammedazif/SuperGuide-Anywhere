@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node", "chrome"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "include": [
+    "tests/**/*.ts",
+    "vitest.config.ts",
+    "playwright.config.ts",
+    "eval/tasks/**/*.ts",
+    "packages/*/src/**/*.test.ts",
+    "packages/*/src/**/*.test.tsx",
+    "apps/*/src/**/*.test.ts"
+  ]
+}

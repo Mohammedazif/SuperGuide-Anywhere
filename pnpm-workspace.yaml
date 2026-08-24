@@ -1,0 +1,11 @@
+packages:
+  - "packages/*"
+  - "apps/*"
+  - "eval/harness"
+  - "tools/eslint-plugin-sga"
+
+# esbuild ships a platform-specific binary that its install script links into place, and
+# vitest, tsx, and tsup all need it. Approving the build deliberately is what keeps a clean
+# `pnpm install --frozen-lockfile` from failing on ERR_PNPM_IGNORED_BUILDS.
+allowBuilds:
+  esbuild: true
