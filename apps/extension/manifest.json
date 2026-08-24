@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "SuperGuide Anywhere",
+  "version": "0.1.0",
+  "description": "Finishes the task you are stuck on, in the web app you are already using — one site at a time, only where you allow it.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAzRwClxPDP5nv6z7rEVDPj+RWUuM8DUZeu4Q8aIcaU0WFEPl+AF+nJ+q8nDEpMZuIdd5KlwaOoEyff080TfSGzk32aP+ROH+vfU2mWLxlOzPpU4ehzFzStT0vsHLmtDtf3bLJI+KpUUxEWak9gAdMuhptrFOsz91H8LBqXyWcW9nflwOmiD0N2zAMHWIc0XRtb/Kug2JIsnxRvJP9Nzo/D0/Oz1NeRyP+Ths7HNXcn2niC3IIxD9TrdzYz9TLSZsSAz1EGug+Zd17i70Hp1UAUhURLEe6MIKFNWV/grUeWvC808/bR+Co7BOlwTFQIlMZAWJuaEsCEkdcRDNlzgdKJwIDAQAB",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "optional_host_permissions": ["*://*/*"],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "SuperGuide Anywhere"
+  },
+  "options_page": "options.html"
+}
