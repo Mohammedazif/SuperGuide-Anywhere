@@ -40,11 +40,6 @@ export const contentToWorkerMessageSchema = z.discriminatedUnion("type", [
     paramsHash: sha256HexSchema,
     approved: z.boolean(),
   }),
-  z.strictObject({
-    type: z.literal("cs:observation"),
-    turnId: turnIdSchema,
-    digest: pageDigestSchema,
-  }),
   z.strictObject({ type: z.literal("cs:stop") }),
   z.strictObject({ type: z.literal("cs:pause") }),
   z.strictObject({ type: z.literal("cs:resume") }),
@@ -73,7 +68,6 @@ export const workerToContentMessageSchema = z.discriminatedUnion("type", [
     expect: z.array(expectPredicateSchema),
     tier: grantTierSchema,
   }),
-  z.strictObject({ type: z.literal("sw:observe"), turnId: turnIdSchema }),
   z.strictObject({
     type: z.literal("sw:error"),
     code: z.enum(["not_activated", "network", "protocol", "internal"]),

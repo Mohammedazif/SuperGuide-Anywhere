@@ -38,7 +38,7 @@ async function openPopupFor(origin: string): Promise<Page> {
 test.beforeAll(async () => {
   siteA = await startSite("127.0.0.1", "<h1>Fixture A</h1>");
   siteB = await startSite("localhost", "<h1>Fixture B</h1>");
-  const staged = stageExtension(["http://127.0.0.1/*", "http://localhost/*"]);
+  const staged = stageExtension(["http://127.0.0.1/*"]);
   context = await launchWithExtension(staged);
   worker = await serviceWorkerOf(context);
 });

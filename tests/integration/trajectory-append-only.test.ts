@@ -34,7 +34,7 @@ describe("migrations on a clean database", () => {
 
   it("applied every migration file", async () => {
     const rows = await app.query<{ name: string }>("SELECT name FROM schema_migrations ORDER BY name");
-    expect(rows.rows.map((row) => row.name)).toEqual(["0001_schema.sql"]);
+    expect(rows.rows.map((row) => row.name)).toEqual(["0001_schema.sql", "0002_turn_events.sql"]);
   });
 
   it("rejects a direct UPDATE on the trajectory, whoever asks", async () => {

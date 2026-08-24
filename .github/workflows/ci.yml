@@ -19,4 +19,36 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
+      - run: pnpm test:unit
       - run: pnpm check:forbidden
+      - run: pnpm check:manifest
+      - run: pnpm check:bundle-boundary
+
+  verified:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: superguide_anywhere
+        ports: ["55433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d superguide_anywhere"
+          --health-interval 2s --health-timeout 3s --health-retries 30
+    env:
+      SGA_ADMIN_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:55433/superguide_anywhere
+      SGA_MIGRATION_DATABASE_URL: postgresql://sga_migrator:local-dev-only@127.0.0.1:55433/superguide_anywhere
+      SGA_DATABASE_URL: postgresql://sga_app:local-dev-only@127.0.0.1:55433/superguide_anywhere
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:integration
+      - run: pnpm test:security
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

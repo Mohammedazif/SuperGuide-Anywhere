@@ -29,5 +29,6 @@ export const inFlightTurnSchema = z.strictObject({
   origin: originSchema,
   tabId: z.number().int().min(0),
   lastSeq: z.number().int().min(-1),
+  delivered: z.number().int().min(0),
 });
 export type InFlightTurn = z.infer<typeof inFlightTurnSchema>;

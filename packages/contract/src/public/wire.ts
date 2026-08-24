@@ -49,11 +49,6 @@ export const confirmRequestSchema = z.strictObject({
   approved: z.boolean(),
 });
 
-export const observationRequestSchema = z.strictObject({
-  turnId: turnIdSchema,
-  digest: pageDigestSchema,
-});
-
 export const quotaResponseSchema = z.strictObject({
   quota: quotaSchema,
 });

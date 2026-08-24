@@ -21,7 +21,6 @@ export const turnEventSchema = z.discriminatedUnion("kind", [
     needsConfirmation: z.boolean(),
     summary: z.string().min(1),
   }),
-  z.strictObject({ kind: z.literal("observation-request"), seq }),
   z.strictObject({ kind: z.literal("question"), seq, text: z.string().min(1) }),
   z.strictObject({
     kind: z.literal("report"),

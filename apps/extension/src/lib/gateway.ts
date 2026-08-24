@@ -2,14 +2,26 @@ import {
   PORT_NAME,
   contentToWorkerMessageSchema,
   type ContentToWorkerMessage,
+  type GrantTier,
   type WorkerToContentMessage,
 } from "@sga/contract/public";
+import { createApiClient } from "./api";
 import { ensureDeviceId, grantFor, readGrants, removeGrant, upsertGrant } from "./storage";
 import { originPattern, syncContentScripts } from "./registration";
+import { TurnSessionManager } from "./session";
 import { uiToWorkerMessageSchema, type UiToWorkerMessage, type WorkerReply } from "./ui-messages";
+
+interface PortContext {
+  tabId: number;
+  origin: string;
+  tier: GrantTier;
+}
 
 export class AgentGateway {
   private readonly ports = new Map<number, chrome.runtime.Port>();
+  private readonly sessions = new TurnSessionManager(createApiClient, (tabId, message) => {
+    this.ports.get(tabId)?.postMessage(message);
+  });
 
   attach(): void {
     chrome.runtime.onInstalled.addListener(() => {
@@ -30,6 +42,7 @@ export class AgentGateway {
     chrome.permissions.onRemoved.addListener(() => {
       void this.reconcile();
     });
+    void this.sessions.resumeAll();
   }
 
   async reconcile(): Promise<void> {
@@ -43,7 +56,7 @@ export class AgentGateway {
     if (held.length !== grants.length) {
       const heldOrigins = new Set(held.map((grant) => grant.origin));
       for (const grant of grants) {
-        if (!heldOrigins.has(grant.origin)) this.dropPortsFor(grant.origin);
+        if (!heldOrigins.has(grant.origin)) this.teardownOrigin(grant.origin);
       }
       await Promise.all(
         grants
@@ -52,9 +65,11 @@ export class AgentGateway {
       );
     }
     await syncContentScripts(held);
+    await this.sessions.resumeAll();
   }
 
-  private dropPortsFor(origin: string): void {
+  private teardownOrigin(origin: string): void {
+    this.sessions.stopForOrigin(origin);
     for (const [tabId, port] of this.ports) {
       if (port.sender?.origin === origin) {
         port.disconnect();
@@ -78,7 +93,7 @@ export class AgentGateway {
       this.ports.delete(tabId);
     });
     port.onMessage.addListener((raw: unknown) => {
-      void this.handlePortMessage(port, raw);
+      void this.handlePortMessage(port, tabId, raw);
     });
   }
 
@@ -86,13 +101,16 @@ export class AgentGateway {
     port.postMessage(message);
   }
 
-  private async handlePortMessage(port: chrome.runtime.Port, raw: unknown): Promise<void> {
+  private async handlePortMessage(
+    port: chrome.runtime.Port,
+    tabId: number,
+    raw: unknown,
+  ): Promise<void> {
     const parsed = contentToWorkerMessageSchema.safeParse(raw);
     if (!parsed.success) {
       this.post(port, { type: "sw:error", code: "protocol", detail: "unparseable message" });
       return;
     }
-    const message = parsed.data;
     const senderOrigin = port.sender?.origin;
     if (senderOrigin === undefined) {
       this.post(port, { type: "sw:error", code: "protocol", detail: "no sender origin" });
@@ -105,35 +123,84 @@ export class AgentGateway {
       port.disconnect();
       return;
     }
-    this.dispatchPortMessage(port, message, grant.tier);
+    try {
+      await this.dispatchPortMessage(port, parsed.data, {
+        tabId,
+        origin: senderOrigin,
+        tier: grant.tier,
+      });
+    } catch (cause) {
+      this.post(port, {
+        type: "sw:error",
+        code: "network",
+        detail: cause instanceof Error ? cause.message : String(cause),
+      });
+    }
   }
 
-  private dispatchPortMessage(
+  private async dispatchPortMessage(
     port: chrome.runtime.Port,
     message: ContentToWorkerMessage,
-    tier: "observe" | "control",
-  ): void {
+    context: PortContext,
+  ): Promise<void> {
     switch (message.type) {
       case "cs:hello":
         this.post(port, {
           type: "sw:status",
-          tier,
+          tier: context.tier,
+          turnId: null,
+          paused: false,
+          quota: null,
+        });
+        await this.sessions.resumeAll();
+        return;
+      case "cs:task":
+        await this.sessions.startTask({
+          origin: context.origin,
+          tabId: context.tabId,
+          tier: context.tier,
+          taskText: message.taskText,
+          digest: message.digest,
+        });
+        return;
+      case "cs:action-result": {
+        const client = await createApiClient();
+        await client.postActionResult({
+          turnId: message.turnId,
+          actionId: message.actionId,
+          result: message.result,
+          digest: message.digest,
+        });
+        return;
+      }
+      case "cs:confirm": {
+        const client = await createApiClient();
+        await client.postConfirm({
+          turnId: message.turnId,
+          actionId: message.actionId,
+          paramsHash: message.paramsHash,
+          approved: message.approved,
+        });
+        return;
+      }
+      case "cs:stop":
+        this.sessions.stopForOrigin(context.origin);
+        this.post(port, {
+          type: "sw:status",
+          tier: context.tier,
           turnId: null,
           paused: false,
           quota: null,
         });
         return;
-      case "cs:task":
-      case "cs:action-result":
-      case "cs:confirm":
-      case "cs:observation":
-      case "cs:stop":
       case "cs:pause":
       case "cs:resume":
         this.post(port, {
-          type: "sw:error",
-          code: "internal",
-          detail: `${message.type} is not wired yet`,
+          type: "sw:status",
+          tier: context.tier,
+          turnId: null,
+          paused: message.type === "cs:pause",
+          quota: null,
         });
         return;
       default: {
@@ -192,7 +259,7 @@ export class AgentGateway {
         return { type: "reply:ok" };
       }
       case "ui:deactivate": {
-        this.dropPortsFor(message.origin);
+        this.teardownOrigin(message.origin);
         const grants = await removeGrant(message.origin);
         await syncContentScripts(grants);
         // An install-time-held host (the e2e staging manifest) cannot be removed; the
