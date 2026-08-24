@@ -58,3 +58,19 @@ export function parseEnvironment(source: Record<string, string | undefined>): En
 export function loadEnvironment(): Environment {
   return parseEnvironment(process.env);
 }
+
+const migrationEnvironmentSchema = z.object({
+  SGA_MIGRATION_DATABASE_URL: z.url(),
+});
+
+export type MigrationEnvironment = z.infer<typeof migrationEnvironmentSchema>;
+
+export function loadMigrationEnvironment(): MigrationEnvironment {
+  const result = migrationEnvironmentSchema.safeParse(process.env);
+  if (!result.success) {
+    throw new EnvironmentError(
+      result.error.issues.map((issue) => `  ${issue.path.join(".")}: ${issue.message}`),
+    );
+  }
+  return result.data;
+}

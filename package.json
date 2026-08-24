@@ -21,7 +21,8 @@
     "test:unit:coverage": "node --env-file-if-exists=.env ./node_modules/vitest/vitest.mjs run --project unit --coverage",
     "test:integration": "node --env-file-if-exists=.env ./node_modules/vitest/vitest.mjs run --project integration",
     "test:security": "node --env-file-if-exists=.env ./node_modules/vitest/vitest.mjs run --project security",
-    "check:forbidden": "node tools/scripts/check-forbidden.mjs"
+    "check:forbidden": "node tools/scripts/check-forbidden.mjs",
+    "db:migrate": "node --env-file-if-exists=.env --import tsx apps/control-plane/src/db/migrate-cli.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "^0.120.0",
