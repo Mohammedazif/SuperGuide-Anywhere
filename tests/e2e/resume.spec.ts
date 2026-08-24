@@ -33,7 +33,7 @@ async function respondsQuickly(candidate: Worker): Promise<boolean> {
     () => true,
     () => false,
   );
-  const timeout = new Promise<boolean>((resolveProbe) => setTimeout(() => resolveProbe(false), 800));
+  const timeout = new Promise<boolean>((resolveProbe) => setTimeout(() => { resolveProbe(false); }, 800));
   return Promise.race([probe, timeout]);
 }
 
@@ -150,7 +150,7 @@ test("service worker termination mid-turn: resume with no duplicate and no gap",
   });
   const closed = (await cdp.send("Target.closeTarget", {
     targetId: workerTarget.targetId,
-  })) as { success: boolean };
+  }));
   expect(closed.success).toBe(true);
 
   const revived = await liveWorker();

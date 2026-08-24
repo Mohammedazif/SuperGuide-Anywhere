@@ -6,6 +6,7 @@ import {
   type TurnEvent,
   type WorkerToContentMessage,
 } from "@sga/contract/public";
+import { observe } from "@sga/observer";
 
 const HOST_ID = "sga-root";
 const WIDGET_HOST_ID = "sg-root";
@@ -111,7 +112,7 @@ class Panel {
 }
 
 function captureDigest(): PageDigest {
-  return { url: location.href, title: document.title, nodes: [] };
+  return observe(document).digest;
 }
 
 class Agent {
