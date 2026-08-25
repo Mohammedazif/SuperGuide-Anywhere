@@ -1,16 +1,22 @@
 import {
   PORT_NAME,
   workerToContentMessageSchema,
+  type ActionResult,
   type GrantTier,
   type PageDigest,
   type TurnEvent,
   type WorkerToContentMessage,
 } from "@sga/contract/public";
-import { observe } from "@sga/observer";
+import { diffDigests, observe } from "@sga/observer";
+import { executeAction } from "@sga/executor";
+import { grantFor } from "./lib/storage";
 
 const HOST_ID = "sga-root";
 const WIDGET_HOST_ID = "sg-root";
 const RECONNECT_DELAY_MS = 400;
+const NAVIGATE_DELAY_MS = 30;
+
+type ExecuteMessage = Extract<WorkerToContentMessage, { type: "sw:execute" }>;
 
 function describeEvent(event: TurnEvent): string {
   switch (event.kind) {
@@ -31,6 +37,21 @@ function describeEvent(event: TurnEvent): string {
     default: {
       const exhausted: never = event;
       throw new Error(`unreachable event ${JSON.stringify(exhausted)}`);
+    }
+  }
+}
+
+function describeResult(result: ActionResult): string {
+  switch (result.status) {
+    case "completed":
+      return result.readBack === undefined ? "done" : `read: ${result.readBack}`;
+    case "failed":
+      return `failed: ${result.error}`;
+    case "refused":
+      return `refused (${result.reason}): ${result.detail}`;
+    default: {
+      const exhausted: never = result;
+      throw new Error(`unreachable result ${JSON.stringify(exhausted)}`);
     }
   }
 }
@@ -109,6 +130,34 @@ class Panel {
     this.log.append(line);
     this.log.scrollTop = this.log.scrollHeight;
   }
+
+  appendConfirmation(decide: (approved: boolean) => void): void {
+    const row = document.createElement("div");
+    row.style.marginBottom = "6px";
+    const approve = document.createElement("button");
+    approve.textContent = "Approve";
+    const decline = document.createElement("button");
+    decline.textContent = "Decline";
+    for (const button of [approve, decline]) {
+      button.style.cssText =
+        "margin-right:6px;padding:2px 10px;border-radius:6px;border:1px solid #c8c8d8;" +
+        "background:#f2f3f8;font:inherit;cursor:pointer";
+    }
+    const settle = (approved: boolean): void => {
+      row.remove();
+      this.appendLine(approved ? "you approved" : "you declined");
+      decide(approved);
+    };
+    approve.addEventListener("click", () => {
+      settle(true);
+    });
+    decline.addEventListener("click", () => {
+      settle(false);
+    });
+    row.append(approve, decline);
+    this.log.append(row);
+    this.log.scrollTop = this.log.scrollHeight;
+  }
 }
 
 function captureDigest(): PageDigest {
@@ -146,10 +195,24 @@ class Agent {
       case "sw:status":
         this.panel.mount(message.tier);
         return;
-      case "sw:event":
+      case "sw:event": {
         this.panel.appendLine(describeEvent(message.event));
+        const event = message.event;
+        if (event.kind === "action-request" && event.needsConfirmation) {
+          this.panel.appendConfirmation((approved) => {
+            this.port?.postMessage({
+              type: "cs:confirm",
+              turnId: message.turnId,
+              actionId: event.actionId,
+              paramsHash: event.paramsHash,
+              approved,
+            });
+          });
+        }
         return;
+      }
       case "sw:execute":
+        void this.execute(message);
         return;
       case "sw:error":
         if (message.code === "not_activated") {
@@ -165,6 +228,38 @@ class Agent {
         throw new Error(`unreachable message ${JSON.stringify(exhausted)}`);
       }
     }
+  }
+
+  private async execute(message: ExecuteMessage): Promise<void> {
+    // The stored grant, read at execution time, outranks the tier the worker
+    // sent: a mid-turn downgrade or revocation must stop this action, and the
+    // executor must refuse even if the server wrongly permitted it.
+    const grant = await grantFor(location.origin);
+    const tier: GrantTier = grant?.tier ?? "observe";
+    const result = await executeAction(message.action, tier, {
+      document,
+      observe: () => observe(document),
+      diff: diffDigests,
+      navigate: (path) => {
+        // Deferred so the action result posts before the page unloads.
+        setTimeout(() => {
+          location.assign(path);
+        }, NAVIGATE_DELAY_MS);
+      },
+      delay: (ms) =>
+        new Promise((resolve) => {
+          setTimeout(resolve, ms);
+        }),
+    });
+    const digest = message.action.kind === "navigate" ? null : captureDigest();
+    this.port?.postMessage({
+      type: "cs:action-result",
+      turnId: message.turnId,
+      actionId: message.actionId,
+      result,
+      digest,
+    });
+    this.panel.appendLine(describeResult(result));
   }
 }
 

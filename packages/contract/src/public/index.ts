@@ -9,3 +9,4 @@ export * from "./events";
 export * from "./wire";
 export * from "./port";
 export * from "./storage";
+export * from "./predicate-eval";

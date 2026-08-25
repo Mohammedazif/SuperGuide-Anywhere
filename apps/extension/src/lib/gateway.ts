@@ -19,9 +19,13 @@ interface PortContext {
 
 export class AgentGateway {
   private readonly ports = new Map<number, chrome.runtime.Port>();
-  private readonly sessions = new TurnSessionManager(createApiClient, (tabId, message) => {
-    this.ports.get(tabId)?.postMessage(message);
-  });
+  private readonly sessions = new TurnSessionManager(
+    createApiClient,
+    (tabId, message) => {
+      this.ports.get(tabId)?.postMessage(message);
+    },
+    async (origin) => (await grantFor(origin))?.tier ?? null,
+  );
 
   attach(): void {
     chrome.runtime.onInstalled.addListener(() => {

@@ -31,6 +31,7 @@ export const deviceIdSchema = z.uuid();
 export const refusalReasonSchema = z.enum([
   "grant_insufficient",
   "confirmation_mismatch",
+  "declined_by_user",
   "site_not_activated",
   "quota_exhausted",
   "budget_exhausted",

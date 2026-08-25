@@ -23,6 +23,7 @@ export class TurnSessionManager {
   constructor(
     private readonly getClient: () => Promise<ControlPlaneClient>,
     private readonly postToTab: (tabId: number, message: WorkerToContentMessage) => void,
+    private readonly tierFor: (origin: string) => Promise<GrantTier | null>,
   ) {}
 
   async startTask(input: {
@@ -104,6 +105,21 @@ export class TurnSessionManager {
               turnId: record.turnId,
               event,
             });
+            if (event.kind === "action-request" && !event.needsConfirmation) {
+              // The tier is read at dispatch time, not turn start, so a mid-turn
+              // downgrade to observe stops the next action.
+              const tier = await this.tierFor(record.origin);
+              if (tier === null) return;
+              this.postToTab(record.tabId, {
+                type: "sw:execute",
+                turnId: record.turnId,
+                actionId: event.actionId,
+                action: event.action,
+                risk: event.risk,
+                expect: event.expect,
+                tier,
+              });
+            }
           },
           onEnd: () => {
             this.live.delete(record.turnId);

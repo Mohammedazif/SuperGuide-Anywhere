@@ -1,1 +1,1 @@
-export type { GrantTier } from "@sga/contract/public";
+export { evaluatePolicy, describeActionForConfirmation } from "./policy";
