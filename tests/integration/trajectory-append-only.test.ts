@@ -38,6 +38,7 @@ describe("migrations on a clean database", () => {
       "0001_schema.sql",
       "0002_turn_events.sql",
       "0003_agent_loop.sql",
+      "0004_erasure.sql",
     ]);
   });
 

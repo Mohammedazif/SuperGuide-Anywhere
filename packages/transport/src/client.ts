@@ -159,6 +159,11 @@ export class ControlPlaneClient {
     return this.requestParsed("/v1/adapters", { method: "GET" }, adaptersResponseSchema);
   }
 
+  async eraseDevice(): Promise<void> {
+    const response = await this.request("/v1/erase", { method: "POST" });
+    if (!response.ok) throw await parseFailure(response);
+  }
+
   async streamTurn(
     turnId: string,
     afterSeq: number,

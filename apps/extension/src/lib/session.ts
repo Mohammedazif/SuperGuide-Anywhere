@@ -20,6 +20,8 @@ function turnKey(turnId: string): string {
 
 export class TurnSessionManager {
   private readonly live = new Map<string, LiveTurn>();
+  private readonly pausedOrigins = new Set<string>();
+  private held: { tabId: number; origin: string; message: WorkerToContentMessage }[] = [];
 
   constructor(
     private readonly getClient: () => Promise<ControlPlaneClient>,
@@ -75,7 +77,24 @@ export class TurnSessionManager {
     }
   }
 
+  pause(origin: string): void {
+    this.pausedOrigins.add(origin);
+  }
+
+  resume(origin: string): void {
+    this.pausedOrigins.delete(origin);
+    const releasable = this.held.filter((entry) => entry.origin === origin);
+    this.held = this.held.filter((entry) => entry.origin !== origin);
+    for (const entry of releasable) this.postToTab(entry.tabId, entry.message);
+  }
+
+  isPaused(origin: string): boolean {
+    return this.pausedOrigins.has(origin);
+  }
+
   stopForOrigin(origin: string): void {
+    this.pausedOrigins.delete(origin);
+    this.held = this.held.filter((entry) => entry.origin !== origin);
     for (const [turnId, turn] of this.live) {
       void chrome.storage.session.get(turnKey(turnId)).then((stored) => {
         const parsed = inFlightTurnSchema.safeParse(stored[turnKey(turnId)]);
@@ -111,7 +130,7 @@ export class TurnSessionManager {
               // downgrade to observe stops the next action.
               const tier = await this.tierFor(record.origin);
               if (tier === null) return;
-              this.postToTab(record.tabId, {
+              const execute: WorkerToContentMessage = {
                 type: "sw:execute",
                 turnId: record.turnId,
                 actionId: event.actionId,
@@ -119,7 +138,12 @@ export class TurnSessionManager {
                 risk: event.risk,
                 expect: event.expect,
                 tier,
-              });
+              };
+              if (this.pausedOrigins.has(record.origin)) {
+                this.held.push({ tabId: record.tabId, origin: record.origin, message: execute });
+              } else {
+                this.postToTab(record.tabId, execute);
+              }
             }
           },
           onEnd: () => {

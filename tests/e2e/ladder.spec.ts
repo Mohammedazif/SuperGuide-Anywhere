@@ -137,7 +137,7 @@ test.beforeAll(async () => {
   await expect(popup.getByTestId("tier")).toHaveText("Observing only");
   await popup.getByTestId("enable-control").click();
   await popup.getByTestId("confirm-control").click();
-  await expect(popup.getByTestId("tier")).toHaveText("Can act here");
+  await expect(popup.getByTestId("tier")).toHaveText("Can observe and act");
   await popup.close();
   await expect(page.locator("#sga-root")).toHaveCount(1);
 });

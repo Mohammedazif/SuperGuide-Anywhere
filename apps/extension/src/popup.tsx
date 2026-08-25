@@ -1,7 +1,7 @@
 import { render } from "preact";
 import { useCallback, useEffect, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import type { SiteGrant } from "@sga/contract/public";
+import type { Quota, SiteGrant } from "@sga/contract/public";
 import { originPattern } from "./lib/registration";
 import { requestWorker } from "./lib/ui-messages";
 
@@ -33,6 +33,7 @@ async function resolveTarget(): Promise<Target | null> {
 function Popup(): JSX.Element {
   const [target, setTarget] = useState<Target | null>(null);
   const [grant, setGrant] = useState<SiteGrant | null>(null);
+  const [quota, setQuota] = useState<Quota | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [armedControl, setArmedControl] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,12 @@ function Popup(): JSX.Element {
     setTarget(resolved);
     if (resolved !== null) {
       const reply = await requestWorker({ type: "ui:status", origin: resolved.origin });
-      setGrant(reply.type === "reply:status" ? reply.grant : null);
+      const currentGrant = reply.type === "reply:status" ? reply.grant : null;
+      setGrant(currentGrant);
+      if (currentGrant !== null) {
+        const quotaReply = await requestWorker({ type: "ui:quota" }).catch(() => null);
+        setQuota(quotaReply?.type === "reply:quota" ? quotaReply.quota : null);
+      }
     }
     setLoaded(true);
   }, []);
@@ -139,6 +145,11 @@ function Popup(): JSX.Element {
           <button class="danger" data-testid="deactivate" onClick={deactivate}>
             Deactivate this site
           </button>
+          {quota !== null ? (
+            <p class="note" data-testid="quota">
+              {quota.used} of {quota.limit} tasks used today
+            </p>
+          ) : null}
         </div>
       )}
       {error !== null ? <p class="note">{error}</p> : null}

@@ -1,5 +1,6 @@
 import {
   PORT_NAME,
+  STORAGE_KEYS,
   contentToWorkerMessageSchema,
   type ContentToWorkerMessage,
   type GrantTier,
@@ -7,7 +8,15 @@ import {
 } from "@sga/contract/public";
 import { refreshAdapterCache } from "./adapters";
 import { createApiClient } from "./api";
-import { ensureDeviceId, grantFor, readGrants, removeGrant, upsertGrant } from "./storage";
+import {
+  ensureDeviceId,
+  grantFor,
+  readGlobalOff,
+  readGrants,
+  removeGrant,
+  upsertGrant,
+  writeGlobalOff,
+} from "./storage";
 import { originPattern, syncContentScripts } from "./registration";
 import { TurnSessionManager } from "./session";
 import { uiToWorkerMessageSchema, type UiToWorkerMessage, type WorkerReply } from "./ui-messages";
@@ -62,6 +71,10 @@ export class AgentGateway {
 
   async reconcile(): Promise<void> {
     await ensureDeviceId();
+    if (await readGlobalOff()) {
+      await syncContentScripts([]);
+      return;
+    }
     const grants = await readGrants();
     const held = [];
     for (const grant of grants) {
@@ -134,7 +147,7 @@ export class AgentGateway {
       return;
     }
     const grant = await grantFor(senderOrigin);
-    if (grant === null) {
+    if (grant === null || (await readGlobalOff())) {
       this.post(port, { type: "sw:error", code: "not_activated", detail: senderOrigin });
       port.disconnect();
       return;
@@ -215,11 +228,13 @@ export class AgentGateway {
         return;
       case "cs:pause":
       case "cs:resume":
+        if (message.type === "cs:pause") this.sessions.pause(context.origin);
+        else this.sessions.resume(context.origin);
         this.post(port, {
           type: "sw:status",
           tier: context.tier,
           turnId: null,
-          paused: message.type === "cs:pause",
+          paused: this.sessions.isPaused(context.origin),
           quota: null,
         });
         return;
@@ -250,7 +265,34 @@ export class AgentGateway {
       case "ui:status":
         return { type: "reply:status", grant: await grantFor(message.origin) };
       case "ui:list-grants":
-        return { type: "reply:grants", grants: await readGrants() };
+        return {
+          type: "reply:grants",
+          grants: await readGrants(),
+          globalOff: await readGlobalOff(),
+          deviceId: await ensureDeviceId(),
+        };
+      case "ui:set-global": {
+        await writeGlobalOff(message.off);
+        if (message.off) {
+          for (const grant of await readGrants()) this.teardownOrigin(grant.origin);
+          await syncContentScripts([]);
+        } else {
+          await this.reconcile();
+        }
+        return { type: "reply:ok" };
+      }
+      case "ui:quota": {
+        const client = await createApiClient();
+        return { type: "reply:quota", quota: await client.fetchQuota() };
+      }
+      case "ui:erase": {
+        const client = await createApiClient();
+        await client.eraseDevice();
+        // A fresh anonymous identity is generated on next use; the erased one
+        // never comes back.
+        await chrome.storage.local.remove(STORAGE_KEYS.deviceId);
+        return { type: "reply:ok" };
+      }
       case "ui:activated": {
         const pattern = originPattern(message.origin);
         const held = await chrome.permissions.contains({ origins: [pattern] });

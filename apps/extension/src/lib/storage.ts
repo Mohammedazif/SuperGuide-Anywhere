@@ -34,6 +34,15 @@ export async function removeGrant(origin: string): Promise<GrantsRecord> {
   return next;
 }
 
+export async function readGlobalOff(): Promise<boolean> {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.globalOff);
+  return stored[STORAGE_KEYS.globalOff] === true;
+}
+
+export async function writeGlobalOff(off: boolean): Promise<void> {
+  await chrome.storage.local.set({ [STORAGE_KEYS.globalOff]: off });
+}
+
 export async function ensureDeviceId(): Promise<string> {
   const stored = await chrome.storage.local.get(STORAGE_KEYS.deviceId);
   const parsed = deviceIdSchema.safeParse(stored[STORAGE_KEYS.deviceId]);

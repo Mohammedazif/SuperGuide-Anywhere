@@ -21,13 +21,14 @@ async function freePort(): Promise<number> {
 
 export interface ControlPlaneProcess {
   baseUrl: string;
+  port: number;
   stop(): Promise<void>;
 }
 
 export async function spawnControlPlane(
-  options: { agentLoop?: "on" | "off" } = {},
+  options: { agentLoop?: "on" | "off"; port?: number; dailyTaskQuota?: string } = {},
 ): Promise<ControlPlaneProcess> {
-  const port = await freePort();
+  const port = options.port ?? (await freePort());
   // The API lives on localhost while fixture sites live on 127.0.0.1: the staged test
   // manifest pre-holds 127.0.0.1 only, so requests to the API stay ordinary CORS requests
   // carrying an Origin header, exactly as in production where the API host is never a
@@ -49,6 +50,9 @@ export async function spawnControlPlane(
         SGA_ALLOWED_EXTENSION_IDS: `chrome-extension://${EXTENSION_ID}`,
         SGA_LOG_LEVEL: "warn",
         SGA_AGENT_LOOP: options.agentLoop ?? "off",
+        ...(options.dailyTaskQuota === undefined
+          ? {}
+          : { SGA_DAILY_TASK_QUOTA: options.dailyTaskQuota }),
       },
     },
   );
@@ -74,6 +78,7 @@ export async function spawnControlPlane(
 
   return {
     baseUrl,
+    port,
     stop: async () => {
       child.kill("SIGTERM");
       await new Promise((resolveExit) => {

@@ -299,6 +299,13 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
     await reply.status(204).send();
   });
 
+  app.post("/v1/erase", async (request, reply) => {
+    const claims = authenticate(request, reply);
+    if (claims === null) return;
+    await pool.query("SELECT erase_device($1)", [claims.deviceId]);
+    await reply.status(204).send();
+  });
+
   app.get("/v1/quota", async (request, reply) => {
     const claims = authenticate(request, reply);
     if (claims === null) return;

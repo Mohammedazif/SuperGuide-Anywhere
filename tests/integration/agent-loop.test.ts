@@ -14,6 +14,7 @@ type ContentBlock = Anthropic.Beta.Messages.BetaContentBlock;
 
 let server: TestControlPlane;
 let token: string;
+let deviceId: string;
 const scripts = new Map<string, BetaMessage[]>();
 
 function modelMessage(
@@ -164,7 +165,8 @@ async function trajectoryKinds(turnId: string): Promise<string[]> {
 
 async function usedToday(): Promise<number> {
   const rows = await server.pool.query<{ used: number }>(
-    "SELECT COALESCE(SUM(used), 0)::int AS used FROM device_usage",
+    "SELECT COALESCE(SUM(used), 0)::int AS used FROM device_usage WHERE device_id = $1",
+    [deviceId],
   );
   return rows.rows[0]?.used ?? 0;
 }
@@ -202,10 +204,11 @@ beforeAll(async () => {
         waits: { resultTimeoutMs: 8000, confirmTimeoutMs: 8000, pollMs: 50 },
       }),
   );
+  deviceId = randomUUID();
   const registered = await fetch(`${server.baseUrl}/v1/device`, {
     method: "POST",
     headers: { origin: TEST_EXTENSION_ORIGIN, "content-type": "application/json" },
-    body: JSON.stringify({ deviceId: randomUUID() }),
+    body: JSON.stringify({ deviceId }),
   });
   expect(registered.status).toBe(200);
   token = ((await registered.json()) as { sessionToken: string }).sessionToken;
