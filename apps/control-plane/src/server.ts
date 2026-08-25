@@ -9,6 +9,7 @@ import {
   type Quota,
 } from "@sga/contract/public";
 import type { DeviceTokenClaims } from "@sga/contract/internal";
+import type { TurnInput } from "./agent/loop";
 import { signDeviceToken, verifyDeviceToken } from "./auth/device-token";
 import type { Environment } from "./env";
 import type { EventBus } from "./notify/bus";
@@ -19,6 +20,11 @@ export interface ServerDeps {
   env: Environment;
   pool: pg.Pool;
   bus: EventBus;
+  agent?: TurnAgentStarter | null;
+}
+
+export interface TurnAgentStarter {
+  start(input: TurnInput): void;
 }
 
 const DEVICE_REGISTRATIONS_PER_IP_PER_DAY = 50;
@@ -145,6 +151,15 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       tier: body.data.tier,
       taskText: body.data.taskText,
     });
+    deps.agent?.start({
+      turnId,
+      deviceId: claims.deviceId,
+      origin: body.data.origin,
+      url: body.data.url,
+      tier: body.data.tier,
+      taskText: body.data.taskText,
+      digest: body.data.digest,
+    });
     await reply.status(202).send({ turnId, quota });
   });
 
@@ -233,9 +248,14 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       return;
     }
     const inserted = await pool.query(
-      `INSERT INTO action_result (action_id, turn_id, result) VALUES ($1, $2, $3)
+      `INSERT INTO action_result (action_id, turn_id, result, digest) VALUES ($1, $2, $3, $4)
        ON CONFLICT (action_id) DO NOTHING`,
-      [body.data.actionId, body.data.turnId, JSON.stringify(body.data.result)],
+      [
+        body.data.actionId,
+        body.data.turnId,
+        JSON.stringify(body.data.result),
+        body.data.digest === null ? null : JSON.stringify(body.data.digest),
+      ],
     );
     if (inserted.rowCount === 1) {
       await store.appendTrajectory(body.data.turnId, "action-result", {

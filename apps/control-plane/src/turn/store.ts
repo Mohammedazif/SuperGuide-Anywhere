@@ -11,7 +11,7 @@ export interface TurnRow {
   deviceId: string;
   origin: string;
   tier: GrantTier;
-  status: "running" | "completed" | "failed" | "refused" | "stopped";
+  status: "running" | "completed" | "failed" | "refused" | "stopped" | "needs-input";
 }
 
 export class TurnStore {
@@ -102,6 +102,30 @@ export class TurnStore {
       [turnId, after],
     );
     return result.rows.map((row) => turnEventSchema.parse(row.payload));
+  }
+
+  async finishTurn(
+    turnId: string,
+    status: Exclude<TurnRow["status"], "running">,
+    inSameTransaction?: (client: pg.PoolClient) => Promise<void>,
+  ): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+      const updated = await client.query(
+        "UPDATE turn SET status = $2, ended_at = now() WHERE id = $1 AND status = 'running'",
+        [turnId, status],
+      );
+      if (updated.rowCount === 1 && inSameTransaction !== undefined) {
+        await inSameTransaction(client);
+      }
+      await client.query("COMMIT");
+    } catch (cause) {
+      await client.query("ROLLBACK");
+      throw cause;
+    } finally {
+      client.release();
+    }
   }
 
   async appendTrajectory(turnId: string, kind: TrajectoryStepKind, payload: unknown): Promise<void> {

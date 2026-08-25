@@ -40,7 +40,7 @@ export const turnEventSchema = z.discriminatedUnion("kind", [
   z.strictObject({
     kind: z.literal("turn-end"),
     seq,
-    status: z.enum(["completed", "failed", "refused", "stopped"]),
+    status: z.enum(["completed", "failed", "refused", "stopped", "needs-input"]),
   }),
 ]);
 export type TurnEvent = z.infer<typeof turnEventSchema>;
