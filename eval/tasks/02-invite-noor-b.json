@@ -1,0 +1,17 @@
+{
+  "id": "02-invite-noor-b",
+  "page": "/settings/team",
+  "variant": "b",
+  "tier": "control",
+  "taskText": "Invite noor@example.com to the team.",
+  "expectedResolution": "L1",
+  "expectedOutcome": "completed",
+  "verify": {
+    "htmlContains": [
+      {
+        "path": "/settings/team",
+        "needle": "noor@example.com"
+      }
+    ]
+  }
+}

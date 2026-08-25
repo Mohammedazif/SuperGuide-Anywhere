@@ -23,6 +23,8 @@ jobs:
       - run: pnpm check:forbidden
       - run: pnpm check:manifest
       - run: pnpm check:bundle-boundary
+      - run: pnpm package
+      - run: pnpm check:package
 
   verified:
     runs-on: ubuntu-latest

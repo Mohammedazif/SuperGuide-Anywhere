@@ -1,0 +1,17 @@
+{
+  "id": "04-invite-lee-from-billing-b",
+  "page": "/settings/billing",
+  "variant": "b",
+  "tier": "control",
+  "taskText": "Add lee@example.com as a team member.",
+  "expectedResolution": "L1",
+  "expectedOutcome": "completed",
+  "verify": {
+    "htmlContains": [
+      {
+        "path": "/settings/team",
+        "needle": "lee@example.com"
+      }
+    ]
+  }
+}

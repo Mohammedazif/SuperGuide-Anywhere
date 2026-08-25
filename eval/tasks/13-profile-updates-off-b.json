@@ -1,0 +1,17 @@
+{
+  "id": "13-profile-updates-off-b",
+  "page": "/settings/profile",
+  "variant": "b",
+  "tier": "control",
+  "taskText": "Turn off the product updates preference and save the profile.",
+  "expectedResolution": "L3",
+  "expectedOutcome": "completed",
+  "verify": {
+    "htmlAbsent": [
+      {
+        "path": "/settings/profile",
+        "needle": "checked"
+      }
+    ]
+  }
+}

@@ -26,7 +26,12 @@ export interface ControlPlaneProcess {
 }
 
 export async function spawnControlPlane(
-  options: { agentLoop?: "on" | "off"; port?: number; dailyTaskQuota?: string } = {},
+  options: {
+    agentLoop?: "on" | "off";
+    adapters?: "on" | "off";
+    port?: number;
+    dailyTaskQuota?: string;
+  } = {},
 ): Promise<ControlPlaneProcess> {
   const port = options.port ?? (await freePort());
   // The API lives on localhost while fixture sites live on 127.0.0.1: the staged test
@@ -50,6 +55,7 @@ export async function spawnControlPlane(
         SGA_ALLOWED_EXTENSION_IDS: `chrome-extension://${EXTENSION_ID}`,
         SGA_LOG_LEVEL: "warn",
         SGA_AGENT_LOOP: options.agentLoop ?? "off",
+        SGA_ADAPTERS: options.adapters ?? "on",
         ...(options.dailyTaskQuota === undefined
           ? {}
           : { SGA_DAILY_TASK_QUOTA: options.dailyTaskQuota }),

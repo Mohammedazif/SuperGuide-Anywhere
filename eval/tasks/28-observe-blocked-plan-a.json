@@ -1,0 +1,17 @@
+{
+  "id": "28-observe-blocked-plan-a",
+  "page": "/settings/plan",
+  "variant": "a",
+  "tier": "observe",
+  "taskText": "Switch us to the Scale plan.",
+  "expectedResolution": "L5",
+  "expectedOutcome": "not-completed",
+  "verify": {
+    "htmlContains": [
+      {
+        "path": "/settings/plan",
+        "needle": "Current plan: growth"
+      }
+    ]
+  }
+}

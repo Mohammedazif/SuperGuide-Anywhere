@@ -181,6 +181,23 @@ test("L2: the reviewed route takes the page to billing", async () => {
     .toContain("/settings/billing");
 });
 
+test("L3 on variant B: the same grounded mechanism survives different markup", async () => {
+  test.setTimeout(360_000);
+  await page.goto(`${app.origin}/settings/profile?variant=b`);
+  await expect(page.locator("#sga-root")).toHaveCount(1);
+  const cutoff = new Date();
+  await startPanelTask("Turn off the product updates preference and save the profile.");
+  const turnId = await newestTurnAfter(cutoff);
+  const approver = approveAll(turnId);
+  const status = await settledStatus(turnId);
+  approver.stop();
+  expect(status).toBe("completed");
+  expect(await reportOutcome(turnId)).toBe("completed");
+  expect(await plannedLevels(turnId)).toContain("L3");
+  const html = await (await fetch(`${app.origin}/settings/profile?variant=b`)).text();
+  expect(html).not.toMatch(/name="updates"[^>]*checked/);
+});
+
 test("L3: a grounded action finishes a task no capability covers", async () => {
   test.setTimeout(360_000);
   await page.goto(`${app.origin}/settings/profile`);

@@ -1,0 +1,17 @@
+{
+  "id": "30-impossible-language-a",
+  "page": "/settings/profile",
+  "variant": "a",
+  "tier": "control",
+  "taskText": "Set the workspace language to Dutch.",
+  "expectedResolution": "L5",
+  "expectedOutcome": "not-completed",
+  "verify": {
+    "htmlContains": [
+      {
+        "path": "/settings/profile",
+        "needle": "Dana Operator"
+      }
+    ]
+  }
+}

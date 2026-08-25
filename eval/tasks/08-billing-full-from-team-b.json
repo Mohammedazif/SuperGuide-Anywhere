@@ -1,0 +1,21 @@
+{
+  "id": "08-billing-full-from-team-b",
+  "page": "/settings/team",
+  "variant": "b",
+  "tier": "control",
+  "taskText": "Update our billing address to 7 Dam Square, Amsterdam, 1012 JS.",
+  "expectedResolution": "L1",
+  "expectedOutcome": "completed",
+  "verify": {
+    "htmlContains": [
+      {
+        "path": "/settings/billing",
+        "needle": "Amsterdam"
+      },
+      {
+        "path": "/settings/billing",
+        "needle": "7 Dam Square"
+      }
+    ]
+  }
+}

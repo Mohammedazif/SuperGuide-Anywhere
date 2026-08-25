@@ -15,3 +15,5 @@ playwright-report/
 test-results/
 *.tsbuildinfo
 store-package/
+dist-package/
+eval/results/

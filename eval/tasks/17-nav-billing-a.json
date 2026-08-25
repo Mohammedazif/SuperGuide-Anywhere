@@ -1,0 +1,12 @@
+{
+  "id": "17-nav-billing-a",
+  "page": "/",
+  "variant": "a",
+  "tier": "control",
+  "taskText": "Take me to the billing settings page.",
+  "expectedResolution": "L2",
+  "expectedOutcome": "completed",
+  "verify": {
+    "urlContains": "/settings/billing"
+  }
+}

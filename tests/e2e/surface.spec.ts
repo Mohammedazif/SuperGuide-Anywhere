@@ -33,11 +33,12 @@ function emitAction(turnId: string, path: string): string {
   return result.stdout.trim();
 }
 
-async function newestTurn(): Promise<string> {
+async function newestTurn(after?: Date): Promise<string> {
   const deadline = Date.now() + 20_000;
   for (;;) {
     const rows = await pool.query<{ id: string }>(
-      "SELECT id FROM turn ORDER BY created_at DESC LIMIT 1",
+      "SELECT id FROM turn WHERE created_at > $1 ORDER BY created_at DESC LIMIT 1",
+      [after ?? new Date(0)],
     );
     const found = rows.rows[0]?.id;
     if (found !== undefined) return found;
@@ -118,6 +119,41 @@ test("stop takes effect before the next action, not after the turn", async () =>
   await new Promise((resolveDelay) => setTimeout(resolveDelay, 3_000));
   expect(page.url()).toContain("/settings/profile");
   expect(await actionResultCount(second)).toBe(0);
+});
+
+test("a mid-turn downgrade to observe stops the next action, not the turn after", async () => {
+  await page.goto(`${app.origin}/settings/profile`);
+  await expect(page.locator("#sga-root")).toHaveCount(1);
+  const cutoff = new Date();
+  await page.mouse.click(VIEW.width - 32, VIEW.height - 32);
+  await page.mouse.click(VIEW.width - 152, VIEW.height - 242);
+  await page.keyboard.type("prove the downgrade lands before the next action");
+  await page.keyboard.press("Enter");
+  const turnId = await newestTurn(cutoff);
+
+  const first = emitAction(turnId, "/settings/team");
+  await expect.poll(() => page.url(), { timeout: 15_000 }).toContain("/settings/team");
+  await expect.poll(() => actionResultCount(first), { timeout: 15_000 }).toBe(1);
+
+  const popup = await context.newPage();
+  await popup.goto(
+    `chrome-extension://${EXTENSION_ID}/popup.html?target=${encodeURIComponent(app.origin)}`,
+  );
+  await popup.getByTestId("drop-observe").click();
+  await expect(popup.getByTestId("tier")).toHaveText("Observing only");
+  await popup.close();
+
+  const second = emitAction(turnId, "/settings/plan");
+  await expect.poll(() => actionResultCount(second), { timeout: 15_000 }).toBe(1);
+  const rows = await pool.query<{ result: { status: string; reason?: string } }>(
+    "SELECT result FROM action_result WHERE action_id = $1",
+    [second],
+  );
+  expect(rows.rows[0]?.result).toMatchObject({
+    status: "refused",
+    reason: "grant_insufficient",
+  });
+  expect(page.url()).toContain("/settings/team");
 });
 
 test("the quota display reflects a server-side change with no extension rebuild", async () => {

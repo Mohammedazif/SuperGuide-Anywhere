@@ -35,6 +35,7 @@ export const environmentSchema = z.object({
   SGA_ALLOWED_EXTENSION_IDS: commaSeparated,
   SGA_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   SGA_AGENT_LOOP: z.enum(["on", "off"]).default("on"),
+  SGA_ADAPTERS: z.enum(["on", "off"]).default("on"),
 });
 
 export type Environment = z.infer<typeof environmentSchema>;

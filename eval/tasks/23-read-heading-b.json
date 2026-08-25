@@ -1,0 +1,12 @@
+{
+  "id": "23-read-heading-b",
+  "page": "/",
+  "variant": "b",
+  "tier": "control",
+  "taskText": "What is the main heading on this page?",
+  "expectedResolution": "L3",
+  "expectedOutcome": "completed",
+  "verify": {
+    "answerContains": "Dashboard"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "id": "22-read-seats-a",
+  "page": "/settings/team",
+  "variant": "a",
+  "tier": "control",
+  "taskText": "List the email addresses of everyone currently on the team.",
+  "expectedResolution": "L3",
+  "expectedOutcome": "completed",
+  "verify": {
+    "answerContains": "kim@example.com"
+  }
+}

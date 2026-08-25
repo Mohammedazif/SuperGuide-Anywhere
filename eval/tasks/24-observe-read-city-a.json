@@ -1,0 +1,12 @@
+{
+  "id": "24-observe-read-city-a",
+  "page": "/settings/billing",
+  "variant": "a",
+  "tier": "observe",
+  "taskText": "What city is on our billing address?",
+  "expectedResolution": "L3",
+  "expectedOutcome": "completed",
+  "verify": {
+    "answerContains": "Rotterdam"
+  }
+}

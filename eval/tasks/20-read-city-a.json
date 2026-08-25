@@ -1,0 +1,18 @@
+{
+  "id": "20-read-city-a",
+  "page": "/settings/billing",
+  "variant": "a",
+  "tier": "control",
+  "taskText": "What city is on our billing address?",
+  "expectedResolution": "L3",
+  "expectedOutcome": "completed",
+  "verify": {
+    "answerContains": "Rotterdam",
+    "htmlContains": [
+      {
+        "path": "/settings/billing",
+        "needle": "Rotterdam"
+      }
+    ]
+  }
+}

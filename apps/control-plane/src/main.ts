@@ -31,7 +31,9 @@ try {
     });
   }
 
-  const app = buildServer({ env, pool, bus, agent, adapterSet: loadAdapterDirectory(ADAPTERS_DIR) });
+  const adapterSet =
+    env.SGA_ADAPTERS === "on" ? loadAdapterDirectory(ADAPTERS_DIR) : { version: 1, adapters: [] };
+  const app = buildServer({ env, pool, bus, agent, adapterSet });
 
   const shutdown = async (): Promise<void> => {
     await app.close();

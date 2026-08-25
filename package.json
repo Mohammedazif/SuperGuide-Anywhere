@@ -25,6 +25,9 @@
     "db:migrate": "node --env-file-if-exists=.env --import tsx apps/control-plane/src/db/migrate-cli.ts",
     "check:manifest": "node tools/scripts/check-manifest.mjs",
     "check:bundle-boundary": "node tools/scripts/check-bundle-boundary.mjs",
+    "package": "pnpm run build && node tools/scripts/package.mjs",
+    "check:package": "node tools/scripts/check-package.mjs",
+    "eval": "node --env-file-if-exists=.env --import tsx eval/run.ts",
     "test:e2e": "playwright test"
   },
   "devDependencies": {
