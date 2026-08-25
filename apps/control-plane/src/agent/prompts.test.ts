@@ -58,8 +58,14 @@ describe("the planner request prefix", () => {
     expect(request.fallbacks).toBe("default");
   });
 
-  it("orders the tools deterministically", () => {
-    expect(AGENT_TOOLS.map((tool) => tool.name)).toEqual(["page_action", "ask_user", "finish"]);
+  it("orders the tools deterministically, mirroring the ladder", () => {
+    expect(AGENT_TOOLS.map((tool) => tool.name)).toEqual([
+      "adapter_capability",
+      "adapter_route",
+      "page_action",
+      "ask_user",
+      "finish",
+    ]);
   });
 
   it("declares every tool strict with closed object schemas throughout", () => {

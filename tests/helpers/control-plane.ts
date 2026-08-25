@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import pg from "pg";
+import type { AdapterSet } from "@sga/contract/public";
 import { parseEnvironment, type Environment } from "../../apps/control-plane/src/env";
 import { EventBus } from "../../apps/control-plane/src/notify/bus";
 import { buildServer, type TurnAgentStarter } from "../../apps/control-plane/src/server";
@@ -29,6 +30,7 @@ export interface AgentContext {
 export async function startTestControlPlane(
   overrides: Partial<Record<string, string>> = {},
   makeAgent?: (context: AgentContext) => TurnAgentStarter,
+  adapterSet?: AdapterSet,
 ): Promise<TestControlPlane> {
   const env = parseEnvironment({
     SGA_DATABASE_URL: appDatabaseUrl(),
@@ -44,7 +46,13 @@ export async function startTestControlPlane(
   const store = new TurnStore(pool);
   const quotas = new QuotaService(pool, env);
   const agent = makeAgent?.({ env, pool, store, quotas }) ?? null;
-  const app = buildServer({ env, pool, bus, agent });
+  const app = buildServer({
+    env,
+    pool,
+    bus,
+    agent,
+    ...(adapterSet === undefined ? {} : { adapterSet }),
+  });
   await app.listen({ port: 0, host: "127.0.0.1" });
   const { port } = app.server.address() as AddressInfo;
   return {

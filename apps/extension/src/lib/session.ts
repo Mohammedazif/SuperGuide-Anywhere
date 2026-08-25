@@ -7,6 +7,7 @@ import {
   type WorkerToContentMessage,
 } from "@sga/contract/public";
 import type { ControlPlaneClient } from "@sga/transport";
+import { cachedAdapterVersion } from "./adapters";
 
 interface LiveTurn {
   turnId: string;
@@ -40,7 +41,7 @@ export class TurnSessionManager {
       tier: input.tier,
       taskText: input.taskText,
       digest: input.digest,
-      adapterSetVersion: null,
+      adapterSetVersion: await cachedAdapterVersion(),
     });
     const record: InFlightTurn = {
       turnId: started.turnId,

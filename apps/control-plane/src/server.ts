@@ -1,10 +1,12 @@
 import Fastify, { type FastifyInstance, type FastifyReply, type FastifyRequest } from "fastify";
 import type pg from "pg";
+import { matchAdapter } from "@sga/adapters";
 import {
   actionResultRequestSchema,
   confirmRequestSchema,
   deviceRegisterRequestSchema,
   taskRequestSchema,
+  type AdapterSet,
   type ErrorCode,
   type Quota,
 } from "@sga/contract/public";
@@ -21,6 +23,7 @@ export interface ServerDeps {
   pool: pg.Pool;
   bus: EventBus;
   agent?: TurnAgentStarter | null;
+  adapterSet?: AdapterSet;
 }
 
 export interface TurnAgentStarter {
@@ -46,6 +49,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const { env, pool, bus } = deps;
   const store = new TurnStore(pool);
   const quotas = new QuotaService(pool, env);
+  const adapterSet: AdapterSet = deps.adapterSet ?? { version: 1, adapters: [] };
   const signingKey = Buffer.from(env.SGA_DEVICE_SIGNING_KEY, "base64");
   const allowedOrigins = new Set(env.SGA_ALLOWED_EXTENSION_IDS);
 
@@ -159,6 +163,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
       tier: body.data.tier,
       taskText: body.data.taskText,
       digest: body.data.digest,
+      adapter: matchAdapter(adapterSet.adapters, new URL(body.data.origin).hostname),
     });
     await reply.status(202).send({ turnId, quota });
   });
@@ -304,7 +309,7 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   app.get("/v1/adapters", async (request, reply) => {
     const claims = authenticate(request, reply);
     if (claims === null) return;
-    await reply.status(200).send({ version: 1, adapters: [] });
+    await reply.status(200).send(adapterSet);
   });
 
   return app;

@@ -5,6 +5,7 @@ import {
   type GrantTier,
   type WorkerToContentMessage,
 } from "@sga/contract/public";
+import { refreshAdapterCache } from "./adapters";
 import { createApiClient } from "./api";
 import { ensureDeviceId, grantFor, readGrants, removeGrant, upsertGrant } from "./storage";
 import { originPattern, syncContentScripts } from "./registration";
@@ -19,10 +20,20 @@ interface PortContext {
 
 export class AgentGateway {
   private readonly ports = new Map<number, chrome.runtime.Port>();
+  // A message posted while a tab is navigating would vanish with its port; it
+  // parks here and flushes when the freshly injected content script says hello.
+  private readonly parked = new Map<number, WorkerToContentMessage[]>();
   private readonly sessions = new TurnSessionManager(
     createApiClient,
     (tabId, message) => {
-      this.ports.get(tabId)?.postMessage(message);
+      const port = this.ports.get(tabId);
+      if (port !== undefined) {
+        port.postMessage(message);
+        return;
+      }
+      const queue = this.parked.get(tabId) ?? [];
+      if (queue.length < 20) queue.push(message);
+      this.parked.set(tabId, queue);
     },
     async (origin) => (await grantFor(origin))?.tier ?? null,
   );
@@ -69,6 +80,7 @@ export class AgentGateway {
       );
     }
     await syncContentScripts(held);
+    void refreshAdapterCache();
     await this.sessions.resumeAll();
   }
 
@@ -148,7 +160,7 @@ export class AgentGateway {
     context: PortContext,
   ): Promise<void> {
     switch (message.type) {
-      case "cs:hello":
+      case "cs:hello": {
         this.post(port, {
           type: "sw:status",
           tier: context.tier,
@@ -156,8 +168,12 @@ export class AgentGateway {
           paused: false,
           quota: null,
         });
+        const queued = this.parked.get(context.tabId) ?? [];
+        this.parked.delete(context.tabId);
+        for (const message of queued) this.post(port, message);
         await this.sessions.resumeAll();
         return;
+      }
       case "cs:task":
         await this.sessions.startTask({
           origin: context.origin,

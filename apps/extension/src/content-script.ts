@@ -131,20 +131,25 @@ class Panel {
     this.log.scrollTop = this.log.scrollHeight;
   }
 
+  // The decision bar sits at a fixed position inside the panel so the person
+  // always finds it in the same place, however long the conversation is.
   appendConfirmation(decide: (approved: boolean) => void): void {
-    const row = document.createElement("div");
-    row.style.marginBottom = "6px";
+    this.panel.style.display = "block";
+    const bar = document.createElement("div");
+    bar.style.cssText =
+      "position:absolute;left:8px;right:8px;bottom:8px;height:26px;display:flex;gap:8px;" +
+      "background:#fff;border-top:1px solid #c8c8d8;padding-top:4px";
     const approve = document.createElement("button");
     approve.textContent = "Approve";
     const decline = document.createElement("button");
     decline.textContent = "Decline";
     for (const button of [approve, decline]) {
       button.style.cssText =
-        "margin-right:6px;padding:2px 10px;border-radius:6px;border:1px solid #c8c8d8;" +
-        "background:#f2f3f8;font:inherit;cursor:pointer";
+        "flex:1;border-radius:6px;border:1px solid #c8c8d8;background:#f2f3f8;" +
+        "font:inherit;cursor:pointer;padding:0";
     }
     const settle = (approved: boolean): void => {
-      row.remove();
+      bar.remove();
       this.appendLine(approved ? "you approved" : "you declined");
       decide(approved);
     };
@@ -154,9 +159,8 @@ class Panel {
     decline.addEventListener("click", () => {
       settle(false);
     });
-    row.append(approve, decline);
-    this.log.append(row);
-    this.log.scrollTop = this.log.scrollHeight;
+    bar.append(approve, decline);
+    this.panel.append(bar);
   }
 }
 

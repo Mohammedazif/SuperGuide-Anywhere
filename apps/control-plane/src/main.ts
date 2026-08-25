@@ -1,12 +1,17 @@
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
 import { loadEnvironment, EnvironmentError } from "./env";
+import { loadAdapterDirectory } from "./adapters-fs";
 import { TurnAgent } from "./agent/loop";
 import { scanForInjection } from "./agent/classifier";
 import { EventBus } from "./notify/bus";
 import { buildServer } from "./server";
 import { QuotaService } from "./turn/quota";
 import { TurnStore } from "./turn/store";
+
+const ADAPTERS_DIR = join(dirname(fileURLToPath(import.meta.url)), "../../../adapters");
 
 try {
   const env = loadEnvironment();
@@ -26,7 +31,7 @@ try {
     });
   }
 
-  const app = buildServer({ env, pool, bus, agent });
+  const app = buildServer({ env, pool, bus, agent, adapterSet: loadAdapterDirectory(ADAPTERS_DIR) });
 
   const shutdown = async (): Promise<void> => {
     await app.close();

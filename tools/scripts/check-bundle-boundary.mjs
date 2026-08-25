@@ -25,4 +25,20 @@ if (leaks.length > 0) {
   }
   process.exit(1);
 }
-console.log(`check:bundle-boundary scanned ${bundles.length} bundles: no internal marker`);
+
+// A CommonJS shim like __require("process") throws at module scope in a service
+// worker and silently kills it. Any node-flavoured require surviving the bundle
+// is a packaging failure, caught here rather than by a dead extension.
+const nodeRequire = /__require\d*\(\s*["'][a-z:_/-]+["']\s*\)/;
+const cjsLeaks = bundles.filter((file) =>
+  nodeRequire.test(readFileSync(join(BUNDLE_DIR, file), "utf8")),
+);
+if (cjsLeaks.length > 0) {
+  for (const file of cjsLeaks) {
+    console.error(`apps/extension/dist/${file} carries an unbundled CommonJS require`);
+  }
+  process.exit(1);
+}
+console.log(
+  `check:bundle-boundary scanned ${bundles.length} bundles: no internal marker, no unbundled require`,
+);
