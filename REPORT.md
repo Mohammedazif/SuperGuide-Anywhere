@@ -184,3 +184,48 @@ extent possible without a live model key: 111 unit tests, 31 integration tests, 
 security tests, 12 browser e2e tests, and every mechanical check pass on a clean
 clone. The remaining distance to "complete" is exactly one secret and five live
 suites that are already written and self-gating.
+
+## Follow-up, 2026-08-25: multi-provider planners
+
+The operator asked for switchable model providers. `SGA_MODEL_PROVIDER` now selects
+`anthropic` (default, unchanged behavior), `openai`, or `gemini`, each with its own
+key variable. The loop, policy engine, and confirmation machinery did not change:
+the loop keeps one internal message shape, and a provider module translates requests
+and responses at the edge, including round-tripping the reasoning state each vendor
+requires back on later turns (encrypted reasoning items; thought signatures). The
+translation layer has 15 offline unit tests.
+
+Changes worth the record:
+
+1. **The closed tool schemas gained explicit `type` on every `const`/`enum` node.**
+   A live probe showed the second provider's strict mode rejects a schema node
+   without a `type` key. The schemas remain byte-stable per build (unit-asserted)
+   and equally valid for every provider.
+2. **"openai" left the forbidden-vendor list.** The list exists to keep third-party
+   product names out of the source; an integrated model provider is the same class
+   as the existing one, which was never listed. The list still guards everything else.
+3. **The injection corpus now fails when a turn never reaches the model.** A dead
+   key produced turns with zero actions, which the no-risky-actions assertions
+   passed vacuously. Each corpus turn must now record at least one model response.
+4. **`pnpm test:e2e` loads `.env`** like every other suite, so the provider
+   selection and key reach the browser tests and the spawned control plane.
+5. **A pre-existing race in the stop e2e test was fixed**: the navigate result row
+   lands before the new document does, so the badge click could fire before the
+   re-injected content script mounted. The test now waits for the panel host.
+
+**Live results, as observed on 2026-08-25:** the operator supplied an OpenAI key
+and selected `openai`. The key authenticates, and with the schema fix the planner
+request passes validation — but every call returns `insufficient_quota`: the OpenAI
+account has no available credit. Consequently `pnpm test:integration` runs 31/32
+with the live cache test failing on that error, and `pnpm test:security` runs 19/20
+with the corpus failing at the new never-reached-the-model guard — both honest
+failures of the account state, not the code. The remaining live suites were not run
+against a key known to be quota-dead. Gemini ships unit-tested but has no key and
+has never been exercised live; its model ids are constants in
+`apps/control-plane/src/agent/providers/gemini.ts` should they need bumping.
+
+Unblocking is unchanged in shape: one working secret. Either add credit to the
+OpenAI account, or set `ANTHROPIC_API_KEY` or `GEMINI_API_KEY` and flip
+`SGA_MODEL_PROVIDER`; then `pnpm test:integration`, `pnpm test:security`,
+`pnpm test:e2e`, `pnpm eval --adapters=on`, and `pnpm eval --adapters=off` run as
+written against the selected provider.

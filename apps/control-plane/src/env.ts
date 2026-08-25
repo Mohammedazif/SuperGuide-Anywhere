@@ -22,21 +22,41 @@ const commaSeparated = z
   )
   .refine((entries) => entries.length > 0, { message: "must list at least one extension origin" });
 
-export const environmentSchema = z.object({
-  SGA_DATABASE_URL: z.url(),
-  SGA_MIGRATION_DATABASE_URL: z.url().optional(),
-  SGA_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
-  SGA_PUBLIC_ORIGIN: z.url(),
-  ANTHROPIC_API_KEY: z.string().min(1),
-  SGA_DEVICE_SIGNING_KEY: base64Key,
-  SGA_STEP_BUDGET: z.coerce.number().int().min(1).default(12),
-  SGA_DAILY_TASK_QUOTA: z.coerce.number().int().min(0).default(20),
-  SGA_DAILY_IP_QUOTA: z.coerce.number().int().min(0).default(200),
-  SGA_ALLOWED_EXTENSION_IDS: commaSeparated,
-  SGA_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
-  SGA_AGENT_LOOP: z.enum(["on", "off"]).default("on"),
-  SGA_ADAPTERS: z.enum(["on", "off"]).default("on"),
-});
+const KEY_OF_PROVIDER = {
+  anthropic: "ANTHROPIC_API_KEY",
+  openai: "OPENAI_API_KEY",
+  gemini: "GEMINI_API_KEY",
+} as const;
+
+export const environmentSchema = z
+  .object({
+    SGA_DATABASE_URL: z.url(),
+    SGA_MIGRATION_DATABASE_URL: z.url().optional(),
+    SGA_PORT: z.coerce.number().int().min(1).max(65535).default(8080),
+    SGA_PUBLIC_ORIGIN: z.url(),
+    SGA_MODEL_PROVIDER: z.enum(["anthropic", "openai", "gemini"]).default("anthropic"),
+    ANTHROPIC_API_KEY: z.string().default(""),
+    OPENAI_API_KEY: z.string().default(""),
+    GEMINI_API_KEY: z.string().default(""),
+    SGA_DEVICE_SIGNING_KEY: base64Key,
+    SGA_STEP_BUDGET: z.coerce.number().int().min(1).default(12),
+    SGA_DAILY_TASK_QUOTA: z.coerce.number().int().min(0).default(20),
+    SGA_DAILY_IP_QUOTA: z.coerce.number().int().min(0).default(200),
+    SGA_ALLOWED_EXTENSION_IDS: commaSeparated,
+    SGA_LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
+    SGA_AGENT_LOOP: z.enum(["on", "off"]).default("on"),
+    SGA_ADAPTERS: z.enum(["on", "off"]).default("on"),
+  })
+  .superRefine((value, context) => {
+    const keyName = KEY_OF_PROVIDER[value.SGA_MODEL_PROVIDER];
+    if (value.SGA_AGENT_LOOP === "on" && value[keyName].length === 0) {
+      context.addIssue({
+        code: "custom",
+        path: [keyName],
+        message: `must be set when SGA_MODEL_PROVIDER=${value.SGA_MODEL_PROVIDER} and the agent loop is on`,
+      });
+    }
+  });
 
 export type Environment = z.infer<typeof environmentSchema>;
 

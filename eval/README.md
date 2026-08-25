@@ -15,11 +15,12 @@ pnpm eval --adapters=on
 pnpm eval --adapters=off
 ```
 
-Each run spawns the control plane with the agent loop live (`ANTHROPIC_API_KEY`
-required), a fresh fixture app per task so seed state is deterministic, and the
-built extension in a real Chromium. Confirmations are approved automatically. Results
-land in `results/adapters-{mode}.json` with per-task outcome, ladder levels used,
-step count, token cost, and wall-clock latency.
+Each run spawns the control plane with the agent loop live (the API key for the
+provider `SGA_MODEL_PROVIDER` selects is required), a fresh fixture app per task so
+seed state is deterministic, and the built extension in a real Chromium.
+Confirmations are approved automatically. Results land in
+`results/adapters-{mode}.json` with the provider that produced them and per-task
+outcome, ladder levels used, step count, token cost, and wall-clock latency.
 
 Determinism: the deterministic layers — policy, predicate evaluation, adapter
 matching tie-breaks, the digest differ — are covered by exact unit and

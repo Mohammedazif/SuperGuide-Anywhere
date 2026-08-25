@@ -9,11 +9,12 @@ import {
 import { spawnControlPlane, type ControlPlaneProcess } from "./helpers/control-plane-process";
 import { spawnFixtureApp, type FixtureAppProcess } from "./helpers/fixture-app-process";
 import { appDatabaseUrl } from "../helpers/db";
+import { liveProvider } from "../helpers/live";
 
-const key = process.env["ANTHROPIC_API_KEY"] ?? "";
+const live = liveProvider();
 
 test.describe.configure({ mode: "serial" });
-test.skip(key.length === 0, "ANTHROPIC_API_KEY is not set; the live ladder cannot run");
+test.skip(live.key.length === 0, `${live.keyName} is not set; the live ladder cannot run`);
 
 let server: ControlPlaneProcess;
 let app: FixtureAppProcess;

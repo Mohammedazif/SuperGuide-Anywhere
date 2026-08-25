@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import Anthropic from "@anthropic-ai/sdk";
 import type { PageDigest, TurnEvent } from "@sga/contract/public";
-import { scanForInjection } from "../../apps/control-plane/src/agent/classifier";
 import { TurnAgent } from "../../apps/control-plane/src/agent/loop";
+import { makeProvider } from "../../apps/control-plane/src/agent/provider";
 import {
   startTestControlPlane,
   TEST_EXTENSION_ORIGIN,
   type TestControlPlane,
 } from "../helpers/control-plane";
+import { liveProvider } from "../helpers/live";
 
-const key = process.env["ANTHROPIC_API_KEY"] ?? "";
+const live = liveProvider();
 
 function node(id: string, role: string, name: string, value?: string): PageDigest["nodes"][number] {
   return {
@@ -89,18 +89,23 @@ const CORPUS: { title: string; hostile: PageDigest["nodes"][number][] }[] = [
 let server: TestControlPlane;
 let token: string;
 
-describe.skipIf(key.length === 0)("the injection corpus", () => {
+describe.skipIf(live.key.length === 0)("the injection corpus", () => {
   beforeAll(async () => {
-    const client = new Anthropic({ apiKey: key });
     server = await startTestControlPlane(
-      { SGA_STEP_BUDGET: "4" },
-      (context) =>
-        new TurnAgent({
+      {
+        SGA_STEP_BUDGET: "4",
+        SGA_MODEL_PROVIDER: live.provider,
+        [live.keyName]: live.key,
+      },
+      (context) => {
+        const provider = makeProvider(context.env);
+        return new TurnAgent({
           ...context,
-          plan: (request) => client.beta.messages.stream(request).finalMessage(),
-          scan: (strings) => scanForInjection(client, strings),
+          plan: (request) => provider.plan(request),
+          scan: (strings) => provider.scan(strings),
           waits: { resultTimeoutMs: 1500, confirmTimeoutMs: 1500, pollMs: 100 },
-        }),
+        });
+      },
     );
     const registered = await fetch(`${server.baseUrl}/v1/device`, {
       method: "POST",
@@ -154,6 +159,16 @@ describe.skipIf(key.length === 0)("the injection corpus", () => {
         if (running.rows[0]?.count === "0") break;
         if (Date.now() > deadline) throw new Error("corpus turns did not settle in time");
         await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+
+      // A turn that never reached the model (key trouble, provider outage) must
+      // fail here rather than pass the corpus vacuously with zero actions.
+      for (const turnId of turnIds) {
+        const responded = await server.pool.query(
+          "SELECT 1 FROM trajectory WHERE turn_id = $1 AND kind = 'model-response'",
+          [turnId],
+        );
+        expect(responded.rowCount, `turn ${turnId} never reached the model`).toBeGreaterThan(0);
       }
 
       const planned = await server.pool.query<{ payload: { risk?: string } }>(

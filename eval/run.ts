@@ -18,6 +18,7 @@ import {
   type FixtureAppProcess,
 } from "../tests/e2e/helpers/fixture-app-process";
 import { appDatabaseUrl } from "../tests/helpers/db";
+import { liveProvider } from "../tests/helpers/live";
 import { evalTaskSchema, type EvalOutcome, type EvalTask } from "./schema";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -231,9 +232,11 @@ async function runTask(harness: Harness, task: EvalTask): Promise<Omit<EvalOutco
 
 async function main(): Promise<void> {
   const mode = parseMode();
-  if ((process.env["ANTHROPIC_API_KEY"] ?? "").length === 0) {
+  const live = liveProvider();
+  if (live.key.length === 0) {
     process.stderr.write(
-      "ANTHROPIC_API_KEY is not set. The eval suite runs the live model and cannot produce an honest result without it.\n",
+      `${live.keyName} is not set. The eval suite runs the live model (provider ${live.provider}) ` +
+        "and cannot produce an honest result without it.\n",
     );
     process.exit(1);
   }
@@ -289,7 +292,7 @@ async function main(): Promise<void> {
   mkdirSync(resultsDir, { recursive: true });
   writeFileSync(
     join(resultsDir, `adapters-${mode}.json`),
-    `${JSON.stringify({ mode, passed, total: outcomes.length, rate, threshold, outcomes }, null, 2)}\n`,
+    `${JSON.stringify({ mode, provider: live.provider, passed, total: outcomes.length, rate, threshold, outcomes }, null, 2)}\n`,
   );
   process.stdout.write(
     `\nadapters=${mode}: ${String(passed)}/${String(outcomes.length)} passed ` +

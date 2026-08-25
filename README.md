@@ -19,7 +19,27 @@ pnpm typecheck && pnpm lint
 ```
 
 `pnpm env:init` writes `.env` from `.env.example` and generates the random signing key.
-Fill in `ANTHROPIC_API_KEY` by hand; no secret value is ever committed.
+Fill in the API key for your chosen model provider by hand; no secret value is ever
+committed.
+
+## Model providers
+
+`SGA_MODEL_PROVIDER` selects who serves the planner and the injection classifier:
+
+| Provider | Key variable | Planner | Classifier |
+|---|---|---|---|
+| `anthropic` (default) | `ANTHROPIC_API_KEY` | `claude-opus-5` | `claude-haiku-4-5` |
+| `openai` | `OPENAI_API_KEY` | `gpt-5.5` | `gpt-5.4-mini` |
+| `gemini` | `GEMINI_API_KEY` | `gemini-2.5-pro` | `gemini-2.5-flash` |
+
+The agent loop, policy engine, and confirmation machinery are provider-neutral: the
+loop speaks one internal message shape, and each provider translates requests and
+responses at the edge (`apps/control-plane/src/agent/providers/`). Switching is one
+`.env` line plus the matching key — no rebuild. The live test suites and `pnpm eval`
+gate on the active provider's key and record which provider produced each result.
+Reasoning state that must round-trip (encrypted reasoning items, thought signatures)
+rides the turn history inside thinking blocks, so a turn is served end to end by the
+provider that started it.
 
 ## Anonymous identity is weak, on purpose and on the record
 

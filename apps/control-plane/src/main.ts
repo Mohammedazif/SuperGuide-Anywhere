@@ -1,11 +1,10 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import Anthropic from "@anthropic-ai/sdk";
 import pg from "pg";
 import { loadEnvironment, EnvironmentError } from "./env";
 import { loadAdapterDirectory } from "./adapters-fs";
 import { TurnAgent } from "./agent/loop";
-import { scanForInjection } from "./agent/classifier";
+import { makeProvider } from "./agent/provider";
 import { EventBus } from "./notify/bus";
 import { buildServer } from "./server";
 import { QuotaService } from "./turn/quota";
@@ -20,14 +19,14 @@ try {
 
   let agent: TurnAgent | null = null;
   if (env.SGA_AGENT_LOOP === "on") {
-    const anthropic = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+    const provider = makeProvider(env);
     agent = new TurnAgent({
       env,
       pool,
       store: new TurnStore(pool),
       quotas: new QuotaService(pool, env),
-      plan: (request) => anthropic.beta.messages.stream(request).finalMessage(),
-      scan: (strings) => scanForInjection(anthropic, strings),
+      plan: (request) => provider.plan(request),
+      scan: (strings) => provider.scan(strings),
     });
   }
 
