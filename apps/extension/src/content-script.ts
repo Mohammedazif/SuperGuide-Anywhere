@@ -17,6 +17,24 @@ const WIDGET_HOST_ID = "sg-root";
 const RECONNECT_DELAY_MS = 400;
 const NAVIGATE_DELAY_MS = 30;
 
+function runtimeAlive(): boolean {
+  try {
+    return typeof chrome.runtime.id === "string";
+  } catch (error) {
+    if (error instanceof Error) return false;
+    throw error;
+  }
+}
+
+function disconnectMessage(): string {
+  try {
+    return chrome.runtime.lastError?.message ?? "";
+  } catch (error) {
+    if (error instanceof Error) return "invalidated";
+    throw error;
+  }
+}
+
 type ExecuteMessage = Extract<WorkerToContentMessage, { type: "sw:execute" }>;
 
 function describeEvent(event: TurnEvent): string {
@@ -67,45 +85,75 @@ class Agent {
   private mounted = false;
   private readonly panel: PanelHandle = createPanel(document, HOST_ID, {
     onTask: (taskText) => {
-      this.port?.postMessage({ type: "cs:task", taskText, digest: captureDigest() });
+      this.post({ type: "cs:task", taskText, digest: captureDigest() });
     },
     onPause: () => {
-      this.port?.postMessage({ type: "cs:pause" });
+      this.post({ type: "cs:pause" });
     },
     onResume: () => {
-      this.port?.postMessage({ type: "cs:resume" });
+      this.post({ type: "cs:resume" });
     },
     onStop: () => {
-      this.port?.postMessage({ type: "cs:stop" });
+      this.post({ type: "cs:stop" });
       this.panel.setActivity("idle");
       this.panel.appendLine("stopped");
     },
   });
 
+  private post(message: object): void {
+    const port = this.port;
+    if (port === null || !runtimeAlive()) return;
+    try {
+      port.postMessage(message);
+    } catch (error) {
+      this.port = null;
+      this.active = false;
+      if (error instanceof Error) return;
+      throw error;
+    }
+  }
+
   connect(): void {
     if (!this.active) return;
-    const port = chrome.runtime.connect({ name: PORT_NAME });
+    if (!runtimeAlive()) {
+      this.active = false;
+      return;
+    }
+    let port: chrome.runtime.Port;
+    try {
+      port = chrome.runtime.connect({ name: PORT_NAME });
+    } catch (error) {
+      this.active = false;
+      this.port = null;
+      if (error instanceof Error) return;
+      throw error;
+    }
     this.port = port;
     port.onDisconnect.addListener(() => {
       this.port = null;
-      if (this.active) {
-        setTimeout(() => {
-          this.connect();
-        }, RECONNECT_DELAY_MS);
+      const detail = disconnectMessage();
+      if (!this.active) return;
+      if (!runtimeAlive() || /invalidated/i.test(detail)) {
+        this.active = false;
+        return;
       }
+      setTimeout(() => {
+        this.connect();
+      }, RECONNECT_DELAY_MS);
     });
     port.onMessage.addListener((raw: unknown) => {
       const parsed = workerToContentMessageSchema.safeParse(raw);
       if (parsed.success) this.handle(parsed.data);
     });
-    port.postMessage({ type: "cs:hello", origin: location.origin, url: location.href });
+    this.post({ type: "cs:hello", origin: location.origin, url: location.href });
   }
 
   private mount(tier: GrantTier): void {
+    if (!this.mounted) {
+      document.documentElement.append(this.panel.host);
+      this.mounted = true;
+    }
     this.panel.setTier(tier);
-    if (this.mounted) return;
-    this.mounted = true;
-    document.documentElement.append(this.panel.host);
   }
 
   private handle(message: WorkerToContentMessage): void {
@@ -123,7 +171,7 @@ class Agent {
         if (event.kind === "turn-end") this.panel.setActivity("idle");
         if (event.kind === "action-request" && event.needsConfirmation) {
           this.panel.showConfirmation((approved) => {
-            this.port?.postMessage({
+            this.post({
               type: "cs:confirm",
               turnId: message.turnId,
               actionId: event.actionId,
@@ -142,7 +190,7 @@ class Agent {
           this.active = false;
           this.mounted = false;
           this.panel.remove();
-          this.port?.disconnect();
+          this.port = null;
           return;
         }
         this.panel.appendLine(`error: ${message.detail}`);
@@ -176,7 +224,7 @@ class Agent {
         }),
     });
     const digest = message.action.kind === "navigate" ? null : captureDigest();
-    this.port?.postMessage({
+    this.post({
       type: "cs:action-result",
       turnId: message.turnId,
       actionId: message.actionId,
