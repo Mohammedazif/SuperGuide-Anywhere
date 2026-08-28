@@ -92,6 +92,7 @@ describe("the confirmation round trip", () => {
       adapterMatched: true,
       siteActivated: true,
       tier: "control",
+      writeConsent: false,
       confirmation: null,
       ...overrides,
     };

@@ -32,6 +32,7 @@ export interface TurnAgentStarter {
 
 const DEVICE_REGISTRATIONS_PER_IP_PER_DAY = 50;
 const TOKEN_HEADER = "x-sga-device-token";
+const EXTENSION_ORIGIN_HEADER = "x-sga-extension-origin";
 
 function sendError(
   reply: FastifyReply,
@@ -56,17 +57,32 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
   const app = Fastify({ logger: { level: env.SGA_LOG_LEVEL } });
 
   app.addHook("onRequest", async (request, reply) => {
-    const origin = request.headers.origin;
+    const headerOrigin = request.headers[EXTENSION_ORIGIN_HEADER];
+    const origin =
+      typeof request.headers.origin === "string" && request.headers.origin.length > 0
+        ? request.headers.origin
+        : typeof headerOrigin === "string" && headerOrigin.length > 0
+          ? headerOrigin
+          : undefined;
     if (origin === undefined || !allowedOrigins.has(origin)) {
+      if (origin !== undefined) {
+        void reply.header("access-control-allow-origin", origin);
+        void reply.header("vary", "origin");
+      }
       sendError(reply, 403, "origin_rejected", "origin is not an allowed extension");
       return reply;
     }
     void reply.header("access-control-allow-origin", origin);
     void reply.header("vary", "origin");
+    void reply.header("access-control-allow-private-network", "true");
     if (request.method === "OPTIONS") {
       void reply
         .header("access-control-allow-methods", "GET, POST")
-        .header("access-control-allow-headers", `content-type, ${TOKEN_HEADER}, last-event-id`)
+        .header(
+          "access-control-allow-headers",
+          `content-type, ${TOKEN_HEADER}, ${EXTENSION_ORIGIN_HEADER}, last-event-id`,
+        )
+        .header("access-control-allow-private-network", "true")
         .header("access-control-max-age", "600")
         .status(204)
         .send();
@@ -189,11 +205,12 @@ export function buildServer(deps: ServerDeps): FastifyInstance {
 
     reply.hijack();
     const raw = reply.raw;
+    const allowOrigin = reply.getHeader("access-control-allow-origin");
     raw.writeHead(200, {
       "content-type": "text/event-stream",
       "cache-control": "no-store",
       connection: "keep-alive",
-      "access-control-allow-origin": request.headers.origin ?? "",
+      "access-control-allow-origin": typeof allowOrigin === "string" ? allowOrigin : "",
       vary: "origin",
     });
     raw.write(":ok\n\n");

@@ -29,11 +29,17 @@ interface TurnRecord {
 async function respondsQuickly(candidate: Worker): Promise<boolean> {
   // Evaluating on a terminated worker hangs forever rather than rejecting, so liveness
   // is decided by a race against a short timeout.
-  const probe = candidate.evaluate(() => 1).then(
-    () => true,
-    () => false,
+  const probe = candidate
+    .evaluate(() => 1)
+    .then(
+      () => true,
+      () => false,
+    );
+  const timeout = new Promise<boolean>((resolveProbe) =>
+    setTimeout(() => {
+      resolveProbe(false);
+    }, 800),
   );
-  const timeout = new Promise<boolean>((resolveProbe) => setTimeout(() => { resolveProbe(false); }, 800));
   return Promise.race([probe, timeout]);
 }
 
@@ -77,7 +83,14 @@ async function pollForRecord(
 function emitEvents(count: number, start: number): void {
   const result = spawnSync(
     "node",
-    ["--import", "tsx", join(REPO_ROOT, "tests/e2e/helpers/emit-events.ts"), turnId, String(count), String(start)],
+    [
+      "--import",
+      "tsx",
+      join(REPO_ROOT, "tests/e2e/helpers/emit-events.ts"),
+      turnId,
+      String(count),
+      String(start),
+    ],
     { encoding: "utf8", cwd: REPO_ROOT },
   );
   expect(result.status, result.stderr).toBe(0);
@@ -117,7 +130,7 @@ test("a task starts a turn and events reach the extension in order", async () =>
   const { width, height } = viewport as { width: number; height: number };
 
   await page.mouse.click(width - 32, height - 32);
-  await page.mouse.click(width - 152, height - 242);
+  await page.mouse.click(width - 220, height - 100);
   await page.keyboard.type("prove the stream survives");
   await page.keyboard.press("Enter");
 
@@ -148,9 +161,9 @@ test("service worker termination mid-turn: resume with no duplicate and no gap",
   await worker.evaluate(() => {
     (globalThis as unknown as { __sgaEpoch: string }).__sgaEpoch = "before-termination";
   });
-  const closed = (await cdp.send("Target.closeTarget", {
+  const closed = await cdp.send("Target.closeTarget", {
     targetId: workerTarget.targetId,
-  }));
+  });
   expect(closed.success).toBe(true);
 
   const revived = await liveWorker();

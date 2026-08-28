@@ -13,10 +13,7 @@ import {
   spawnControlPlane,
   type ControlPlaneProcess,
 } from "../tests/e2e/helpers/control-plane-process";
-import {
-  spawnFixtureApp,
-  type FixtureAppProcess,
-} from "../tests/e2e/helpers/fixture-app-process";
+import { spawnFixtureApp, type FixtureAppProcess } from "../tests/e2e/helpers/fixture-app-process";
 import { appDatabaseUrl } from "../tests/helpers/db";
 import { liveProvider } from "../tests/helpers/live";
 import { evalTaskSchema, type EvalOutcome, type EvalTask } from "./schema";
@@ -77,7 +74,11 @@ function approveAll(pool: pg.Pool, page: Page, turnId: string): { stop: () => vo
           "SELECT payload FROM turn_event WHERE turn_id = $1 ORDER BY seq",
           [turnId],
         )
-        .catch(() => ({ rows: [] as { payload: { kind: string; needsConfirmation?: boolean; actionId?: string } }[] }));
+        .catch(() => ({
+          rows: [] as {
+            payload: { kind: string; needsConfirmation?: boolean; actionId?: string };
+          }[],
+        }));
       for (const row of rows.rows) {
         const event = row.payload;
         if (event.kind !== "action-request" || event.needsConfirmation !== true) continue;
@@ -92,7 +93,7 @@ function approveAll(pool: pg.Pool, page: Page, turnId: string): { stop: () => vo
         }
         clicked.add(actionId);
         await new Promise((resolve) => setTimeout(resolve, 750));
-        await page.mouse.click(VIEW.width - 220, VIEW.height - 83).catch(() => undefined);
+        await page.mouse.click(VIEW.width - 280, VIEW.height - 152).catch(() => undefined);
       }
       await new Promise((resolve) => setTimeout(resolve, 500));
     }
@@ -129,7 +130,7 @@ async function runTask(harness: Harness, task: EvalTask): Promise<Omit<EvalOutco
 
     const cutoff = new Date();
     await page.mouse.click(VIEW.width - 32, VIEW.height - 32);
-    await page.mouse.click(VIEW.width - 152, VIEW.height - 242);
+    await page.mouse.click(VIEW.width - 220, VIEW.height - 100);
     await page.keyboard.type(task.taskText);
     await page.keyboard.press("Enter");
     const turnId = await newestTurnAfter(pool, cutoff);
@@ -247,7 +248,10 @@ async function main(): Promise<void> {
   const staged = stageExtension(["http://127.0.0.1/*"]);
   const context = await launchWithExtension(staged);
   const worker = await serviceWorkerOf(context);
-  await worker.evaluate((base) => chrome.storage.local.set({ "sga.apiBase": base }), server.baseUrl);
+  await worker.evaluate(
+    (base) => chrome.storage.local.set({ "sga.apiBase": base }),
+    server.baseUrl,
+  );
   const harness: Harness = { server, context, pool };
 
   const outcomes: EvalOutcome[] = [];

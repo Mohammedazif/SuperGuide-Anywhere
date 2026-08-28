@@ -1,7 +1,7 @@
 import { ControlPlaneClient, registerDevice } from "@sga/transport";
 import { ensureDeviceId } from "./storage";
 
-const DEFAULT_API_BASE = "https://api.superguideanywhere.com";
+const DEFAULT_API_BASE = "http://127.0.0.1:8080";
 const API_BASE_KEY = "sga.apiBase";
 const TOKEN_KEY = "sga.deviceToken";
 
@@ -11,9 +11,13 @@ export async function resolveApiBase(): Promise<string> {
   return typeof value === "string" && value.length > 0 ? value : DEFAULT_API_BASE;
 }
 
+function extensionOrigin(): string {
+  return `chrome-extension://${chrome.runtime.id}`;
+}
+
 async function refreshToken(baseUrl: string): Promise<string> {
   const deviceId = await ensureDeviceId();
-  const registered = await registerDevice(baseUrl, deviceId);
+  const registered = await registerDevice(baseUrl, deviceId, extensionOrigin());
   await chrome.storage.session.set({ [TOKEN_KEY]: registered.sessionToken });
   return registered.sessionToken;
 }
@@ -22,6 +26,7 @@ export async function createApiClient(): Promise<ControlPlaneClient> {
   const baseUrl = await resolveApiBase();
   return new ControlPlaneClient({
     baseUrl,
+    extensionOrigin: extensionOrigin(),
     getToken: async () => {
       const stored = await chrome.storage.session.get(TOKEN_KEY);
       const token = stored[TOKEN_KEY];

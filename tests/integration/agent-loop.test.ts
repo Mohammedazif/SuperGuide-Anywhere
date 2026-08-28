@@ -134,7 +134,8 @@ async function awaitEvent<K extends TurnEvent["kind"]>(
   return eventually(async () => {
     const all = await events(turnId);
     const match = all.find(
-      (event): event is Extract<TurnEvent, { kind: K }> => event.kind === kind && where(event as Extract<TurnEvent, { kind: K }>),
+      (event): event is Extract<TurnEvent, { kind: K }> =>
+        event.kind === kind && where(event as Extract<TurnEvent, { kind: K }>),
     );
     return match ?? null;
   }, `${kind} event on ${turnId}`);
@@ -334,6 +335,149 @@ describe("the turn loop", () => {
     expect(consumed.rows[0]?.consumed).toBe(true);
   });
 
+  it("does not ask again for a later write in the same turn", async () => {
+    const task = `two writes ${randomUUID()}`;
+    scripts.set(task, [
+      modelMessage(
+        [
+          toolUse("page_action", {
+            action: { kind: "click", target: { id: "e00000002" } },
+            expect: [],
+            summary: "Focus the contact email",
+          }),
+        ],
+        "tool_use",
+      ),
+      modelMessage(
+        [
+          toolUse("page_action", {
+            action: { kind: "type", target: { id: "e00000002" }, value: "two@example.com" },
+            expect: [],
+            summary: "Type the contact email",
+          }),
+        ],
+        "tool_use",
+      ),
+      modelMessage(
+        [toolUse("finish", { outcome: "completed", detail: "email typed" })],
+        "tool_use",
+      ),
+    ]);
+    const turnId = await startTask(task);
+
+    const first = await awaitEvent(turnId, "action-request", (event) => event.needsConfirmation);
+    expect(
+      (
+        await api("/v1/confirm", {
+          turnId,
+          actionId: first.actionId,
+          paramsHash: first.paramsHash,
+          approved: true,
+        })
+      ).status,
+    ).toBe(204);
+    const firstDispatch = await awaitEvent(
+      turnId,
+      "action-request",
+      (event) => !event.needsConfirmation && event.actionId === first.actionId,
+    );
+    await deliverResult(turnId, firstDispatch.actionId);
+
+    const second = await awaitEvent(
+      turnId,
+      "action-request",
+      (event) => event.actionId !== first.actionId,
+    );
+    expect(second.needsConfirmation).toBe(false);
+    await deliverResult(turnId, second.actionId);
+
+    const end = await awaitEvent(turnId, "turn-end");
+    expect(end.status).toBe("completed");
+  });
+
+  it("still asks for a sensitive action after write consent", async () => {
+    const task = `sensitive after write ${randomUUID()}`;
+    scripts.set(task, [
+      modelMessage(
+        [
+          toolUse("page_action", {
+            action: { kind: "click", target: { id: "e00000002" } },
+            expect: [],
+            summary: "Focus the contact email",
+          }),
+        ],
+        "tool_use",
+      ),
+      modelMessage(
+        [
+          toolUse("page_action", {
+            action: { kind: "click", target: { id: "e00000001" } },
+            expect: [],
+            summary: "Open billing",
+          }),
+        ],
+        "tool_use",
+      ),
+      modelMessage(
+        [toolUse("finish", { outcome: "completed", detail: "opened billing" })],
+        "tool_use",
+      ),
+    ]);
+    const turnId = await startTask(task);
+
+    const writeAsk = await awaitEvent(turnId, "action-request", (event) => event.needsConfirmation);
+    expect(
+      (
+        await api("/v1/confirm", {
+          turnId,
+          actionId: writeAsk.actionId,
+          paramsHash: writeAsk.paramsHash,
+          approved: true,
+        })
+      ).status,
+    ).toBe(204);
+    await deliverResult(
+      turnId,
+      (
+        await awaitEvent(
+          turnId,
+          "action-request",
+          (event) => !event.needsConfirmation && event.actionId === writeAsk.actionId,
+        )
+      ).actionId,
+    );
+
+    const sensitiveAsk = await awaitEvent(
+      turnId,
+      "action-request",
+      (event) => event.needsConfirmation && event.actionId !== writeAsk.actionId,
+    );
+    expect(sensitiveAsk.risk).toBe("sensitive");
+    expect(
+      (
+        await api("/v1/confirm", {
+          turnId,
+          actionId: sensitiveAsk.actionId,
+          paramsHash: sensitiveAsk.paramsHash,
+          approved: true,
+        })
+      ).status,
+    ).toBe(204);
+    await deliverResult(
+      turnId,
+      (
+        await awaitEvent(
+          turnId,
+          "action-request",
+          (event) => !event.needsConfirmation && event.actionId === sensitiveAsk.actionId,
+        )
+      ).actionId,
+    );
+
+    const end = await awaitEvent(turnId, "turn-end");
+    expect(end.status).toBe("completed");
+  });
+
   it("treats a decline as a refusal and does not execute", async () => {
     const task = `declined write ${randomUUID()}`;
     scripts.set(task, [
@@ -515,18 +659,13 @@ describe("the turn loop", () => {
         [
           toolUse("page_action", {
             action: { kind: "readBack", target: { id: "e00000001" } },
-            expect: [
-              { kind: "element-present", target: { role: "alert", name: "Saved" } },
-            ],
+            expect: [{ kind: "element-present", target: { role: "alert", name: "Saved" } }],
             summary: "Look for a saved banner",
           }),
         ],
         "tool_use",
       ),
-      modelMessage(
-        [toolUse("finish", { outcome: "completed", detail: "all done" })],
-        "tool_use",
-      ),
+      modelMessage([toolUse("finish", { outcome: "completed", detail: "all done" })], "tool_use"),
     ]);
     const before = await usedToday();
     const turnId = await startTask(task);

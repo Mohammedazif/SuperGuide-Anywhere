@@ -123,16 +123,32 @@ function Popup(): JSX.Element {
           </div>
           {grant.tier === "observe" ? (
             armedControl ? (
-              <button class="primary" data-testid="confirm-control" onClick={() => { setTier("control"); }}>
+              <button
+                class="primary"
+                data-testid="confirm-control"
+                onClick={() => {
+                  setTier("control");
+                }}
+              >
                 Confirm: allow acting on this site
               </button>
             ) : (
-              <button data-testid="enable-control" onClick={() => { setArmedControl(true); }}>
+              <button
+                data-testid="enable-control"
+                onClick={() => {
+                  setArmedControl(true);
+                }}
+              >
                 Enable control…
               </button>
             )
           ) : (
-            <button data-testid="drop-observe" onClick={() => { setTier("observe"); }}>
+            <button
+              data-testid="drop-observe"
+              onClick={() => {
+                setTier("observe");
+              }}
+            >
               Drop to observe only
             </button>
           )}

@@ -10,28 +10,48 @@ export interface Theme {
   controlBg: string;
   inputBg: string;
   shadow: string;
+  accent: string;
+  accentText: string;
+  userBubble: string;
+  userBubbleText: string;
+  agentBubble: string;
+  errorBubble: string;
+  errorText: string;
   scheme: ColorScheme;
 }
 
 export interface ThemeTargets {
   host: HTMLElement;
   panel: HTMLElement;
+  header: HTMLElement;
+  composer: HTMLElement;
   input: HTMLInputElement;
+  send: HTMLButtonElement;
   log: HTMLElement;
+  title: HTMLElement;
+  status: HTMLElement;
   quotaText: HTMLElement;
   controls: HTMLButtonElement[];
-  confirmBar: HTMLElement | null;
+  decisionBar: HTMLElement | null;
+  emptyHint: HTMLElement | null;
 }
 
-const THEMES: Record<ColorScheme, Theme> = {
+export const THEMES: Record<ColorScheme, Theme> = {
   light: {
     panelBg: "#fff",
-    border: "#c8c8d8",
+    border: "#d8dbe3",
     text: "#1a1a2e",
-    muted: "#666",
-    controlBg: "#f2f3f8",
-    inputBg: "#fff",
-    shadow: "0 4px 16px rgba(0,0,0,0.25)",
+    muted: "#6b7280",
+    controlBg: "#f3f4f8",
+    inputBg: "#f7f8fb",
+    shadow: "0 12px 40px rgba(24, 28, 45, 0.18)",
+    accent: "#2b3a67",
+    accentText: "#fff",
+    userBubble: "#2b3a67",
+    userBubbleText: "#fff",
+    agentBubble: "#f3f4f8",
+    errorBubble: "#fdecec",
+    errorText: "#9b1c1c",
     scheme: "light",
   },
   dark: {
@@ -41,7 +61,14 @@ const THEMES: Record<ColorScheme, Theme> = {
     muted: "#9a9aa8",
     controlBg: "#2a2a33",
     inputBg: "#2a2a33",
-    shadow: "0 4px 16px rgba(0,0,0,0.55)",
+    shadow: "0 12px 40px rgba(0,0,0,0.55)",
+    accent: "#8aa4e8",
+    accentText: "#1a1a2e",
+    userBubble: "#3d4f86",
+    userBubbleText: "#fff",
+    agentBubble: "#2a2a33",
+    errorBubble: "#3a2224",
+    errorText: "#f0b4b4",
     scheme: "dark",
   },
 };
@@ -230,14 +257,26 @@ export function detectColorScheme(doc: Document): ColorScheme {
   }
 }
 
-function paintControl(button: HTMLButtonElement, theme: Theme, wide: boolean): void {
+function paintControl(button: HTMLButtonElement, theme: Theme): void {
   button.style.background = theme.controlBg;
   button.style.borderColor = theme.border;
   button.style.color = theme.text;
-  if (wide) {
-    button.style.width = "60px";
-    button.style.height = "20px";
+}
+
+export function paintBubble(bubble: HTMLElement, theme: Theme): void {
+  const kind = bubble.dataset.kind;
+  if (kind === "user") {
+    bubble.style.background = theme.userBubble;
+    bubble.style.color = theme.userBubbleText;
+    return;
   }
+  if (kind === "error") {
+    bubble.style.background = theme.errorBubble;
+    bubble.style.color = theme.errorText;
+    return;
+  }
+  bubble.style.background = theme.agentBubble;
+  bubble.style.color = theme.text;
 }
 
 export function paintTheme(doc: Document, targets: ThemeTargets): void {
@@ -248,17 +287,28 @@ export function paintTheme(doc: Document, targets: ThemeTargets): void {
   targets.panel.style.border = `1px solid ${theme.border}`;
   targets.panel.style.boxShadow = theme.shadow;
   targets.panel.style.color = theme.text;
+  targets.header.style.borderBottom = `1px solid ${theme.border}`;
+  targets.composer.style.borderTop = `1px solid ${theme.border}`;
+  targets.title.style.color = theme.text;
+  targets.status.style.color = theme.muted;
+  targets.quotaText.style.color = theme.muted;
   targets.input.style.background = theme.inputBg;
   targets.input.style.borderColor = theme.border;
   targets.input.style.color = theme.text;
+  targets.send.style.background = theme.accent;
+  targets.send.style.color = theme.accentText;
+  targets.send.style.borderColor = theme.accent;
   targets.log.style.color = theme.text;
-  targets.quotaText.style.color = theme.muted;
-  for (const button of targets.controls) paintControl(button, theme, true);
-  if (targets.confirmBar !== null) {
-    targets.confirmBar.style.background = theme.panelBg;
-    targets.confirmBar.style.borderTop = `1px solid ${theme.border}`;
-    for (const button of targets.confirmBar.querySelectorAll("button")) {
-      paintControl(button, theme, false);
+  if (targets.emptyHint !== null) targets.emptyHint.style.color = theme.muted;
+  for (const button of targets.controls) paintControl(button, theme);
+  for (const bubble of targets.log.querySelectorAll("[data-kind]")) {
+    if (bubble instanceof HTMLElement) paintBubble(bubble, theme);
+  }
+  if (targets.decisionBar !== null) {
+    targets.decisionBar.style.background = theme.panelBg;
+    targets.decisionBar.style.borderTop = `1px solid ${theme.border}`;
+    for (const button of targets.decisionBar.querySelectorAll("button")) {
+      if (button instanceof HTMLButtonElement) paintControl(button, theme);
     }
   }
 }

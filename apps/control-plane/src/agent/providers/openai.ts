@@ -18,8 +18,8 @@ import {
 } from "../classifier";
 import type { ModelProvider } from "../provider";
 
-export const OPENAI_PLANNER_MODEL = "o3-mini";
-export const OPENAI_CLASSIFIER_MODEL = "o3-mini";
+export const OPENAI_PLANNER_MODEL = "gpt-5.5";
+export const OPENAI_CLASSIFIER_MODEL = "gpt-5.4-mini";
 
 type BetaMessage = Anthropic.Beta.Messages.BetaMessage;
 type ContentBlock = Anthropic.Beta.Messages.BetaContentBlock;

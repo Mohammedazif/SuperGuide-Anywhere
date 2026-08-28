@@ -208,6 +208,23 @@ describe("step resolution against a digest", () => {
       ok: true,
       value: { kind: "navigate", path: "/settings/team" },
     });
+    expect(
+      resolveStepAction(
+        {
+          action: "waitFor",
+          predicate: { kind: "element-present", target: { role: "link", name: "Connections" } },
+        },
+        [],
+        digest,
+      ),
+    ).toEqual({
+      ok: true,
+      value: {
+        kind: "waitFor",
+        predicate: { kind: "element-present", target: { role: "link", name: "Connections" } },
+        timeoutMs: 8000,
+      },
+    });
   });
 
   it("fails honestly when the target or the param is absent", () => {

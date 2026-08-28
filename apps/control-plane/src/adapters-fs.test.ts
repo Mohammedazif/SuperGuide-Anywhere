@@ -15,6 +15,21 @@ describe("the shipped adapter directory", () => {
       "seat.invite",
       "billing.update-address",
     ]);
+    const notion = set.adapters.find((adapter) => adapter.host === "app.notion.com");
+    expect(notion).toBeDefined();
+    expect(notion?.routes).toEqual([]);
+    expect(notion?.capabilities.map((capability) => capability.id)).toEqual([
+      "settings.open",
+      "slack.connect",
+    ]);
+    expect(notion?.capabilities[1]?.steps.map((step) => step.action)).toEqual([
+      "waitFor",
+      "click",
+      "waitFor",
+      "click",
+      "waitFor",
+      "click",
+    ]);
     for (const adapter of set.adapters) {
       for (const capability of adapter.capabilities) {
         expect(capability.expect.length).toBeGreaterThan(0);

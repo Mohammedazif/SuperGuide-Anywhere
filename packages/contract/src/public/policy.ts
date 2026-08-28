@@ -23,6 +23,7 @@ export const policyInputSchema = z.strictObject({
   adapterMatched: z.boolean(),
   siteActivated: z.boolean(),
   tier: grantTierSchema,
+  writeConsent: z.boolean(),
   confirmation: confirmationSchema.nullable(),
 });
 export type PolicyInput = z.infer<typeof policyInputSchema>;

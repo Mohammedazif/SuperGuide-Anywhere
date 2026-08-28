@@ -100,6 +100,40 @@ describe("the overlay panel", () => {
     Reflect.deleteProperty(window, "matchMedia");
   });
 
+  it("locks the page only while control is running", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    expect(panel.host.dataset.sgaLocked).toBe("false");
+    panel.setActivity("running");
+    expect(panel.host.dataset.sgaLocked).toBe("false");
+    panel.setTier("control");
+    panel.setActivity("running");
+    expect(panel.host.dataset.sgaLocked).toBe("true");
+    panel.setActivity("paused");
+    expect(panel.host.dataset.sgaLocked).toBe("false");
+    panel.remove();
+  });
+
+  it("keeps the chat open while the agent is running", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    panel.setTier("control");
+    panel.setActivity("running");
+    panel.appendLine("wants to act: click");
+    panel.setActivity("running");
+    panel.appendLine("done");
+    panel.remove();
+  });
+
+  it("blocks page keystrokes while locked", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    document.documentElement.append(panel.host);
+    panel.setTier("control");
+    panel.setActivity("running");
+    const event = new KeyboardEvent("keydown", { key: "a", bubbles: true, cancelable: true });
+    document.body.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    panel.remove();
+  });
+
   it("stops watching the page after remove", async () => {
     const panel = createPanel(document, "sga-root", callbacks);
     panel.remove();

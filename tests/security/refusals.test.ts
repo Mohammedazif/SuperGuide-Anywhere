@@ -1,11 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from "vitest";
 import fc from "fast-check";
-import {
-  type ActionResult,
-  type AgentAction,
-  type Confirmation,
-} from "@sga/contract/public";
+import { type ActionResult, type AgentAction, type Confirmation } from "@sga/contract/public";
 import { executeAction, type ExecutorDeps } from "../../packages/executor/src/executor";
 import { observe } from "../../packages/observer/src/observe";
 import { evaluatePolicy } from "../../packages/policy/src/policy";
@@ -79,7 +75,9 @@ describe("15.4 observe grant, server", () => {
       .map((parts): AgentAction => ({ kind: "check", ...parts })),
     targetArb.map((target): AgentAction => ({ kind: "focus", target })),
     targetArb.map((target): AgentAction => ({ kind: "scrollIntoView", target })),
-    fc.string({ maxLength: 30 }).map((suffix): AgentAction => ({ kind: "navigate", path: `/${suffix}` })),
+    fc
+      .string({ maxLength: 30 })
+      .map((suffix): AgentAction => ({ kind: "navigate", path: `/${suffix}` })),
   );
   const confirmationArb: fc.Arbitrary<Confirmation | null> = fc.option(
     fc.record({
@@ -97,7 +95,8 @@ describe("15.4 observe grant, server", () => {
         fc.constantFrom("read" as const, "write" as const, "sensitive" as const),
         fc.boolean(),
         confirmationArb,
-        (action, risk, adapterMatched, confirmation) => {
+        fc.boolean(),
+        (action, risk, adapterMatched, confirmation, writeConsent) => {
           const verdict = evaluatePolicy({
             actionId: ACTION_ID,
             action,
@@ -106,6 +105,7 @@ describe("15.4 observe grant, server", () => {
             adapterMatched,
             siteActivated: true,
             tier: "observe",
+            writeConsent,
             confirmation,
           });
           expect(verdict).toEqual({ kind: "refuse", reason: "grant_insufficient" });
@@ -161,6 +161,7 @@ describe("15.4 confirmation scope and params tampering", () => {
     adapterMatched: true,
     siteActivated: true,
     tier: "control" as const,
+    writeConsent: false,
   };
 
   it("approving action A does not authorise action B", () => {
@@ -176,8 +177,8 @@ describe("15.4 confirmation scope and params tampering", () => {
       paramsHash: OTHER_HASH,
       approved: true,
     };
-    expect(evaluatePolicy({ ...base, actionId: ACTION_ID, paramsHash: HASH, confirmation })).toEqual(
-      { kind: "refuse", reason: "confirmation_mismatch" },
-    );
+    expect(
+      evaluatePolicy({ ...base, actionId: ACTION_ID, paramsHash: HASH, confirmation }),
+    ).toEqual({ kind: "refuse", reason: "confirmation_mismatch" });
   });
 });

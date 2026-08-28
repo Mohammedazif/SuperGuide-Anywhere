@@ -59,7 +59,10 @@ test.beforeAll(async () => {
   const staged = stageExtension(["http://127.0.0.1/*"]);
   context = await launchWithExtension(staged);
   const worker = await serviceWorkerOf(context);
-  await worker.evaluate((base) => chrome.storage.local.set({ "sga.apiBase": base }), server.baseUrl);
+  await worker.evaluate(
+    (base) => chrome.storage.local.set({ "sga.apiBase": base }),
+    server.baseUrl,
+  );
   page = await context.newPage();
 });
 
@@ -99,7 +102,7 @@ test("the UI renders under the fixture app's strict CSP, header byte-identical",
 
   await expect(page.locator("#sga-root")).toHaveCount(1);
   await page.mouse.click(VIEW.width - 32, VIEW.height - 32);
-  await page.mouse.click(VIEW.width - 152, VIEW.height - 242);
+  await page.mouse.click(VIEW.width - 220, VIEW.height - 100);
   await page.keyboard.type("prove the panel accepts input under this CSP");
   await page.keyboard.press("Enter");
   await newestTurn();
@@ -116,7 +119,7 @@ test("stop takes effect before the next action, not after the turn", async () =>
   // wait for the re-injected content script to mount its host, or it hits the page.
   await page.locator("#sga-root").waitFor({ state: "attached", timeout: 10_000 });
   await page.mouse.click(VIEW.width - 32, VIEW.height - 32);
-  await page.mouse.click(VIEW.width - 254, VIEW.height - 210);
+  await page.mouse.click(VIEW.width - 54, VIEW.height - 528);
 
   const second = emitAction(turnId, "/settings/plan");
   await new Promise((resolveDelay) => setTimeout(resolveDelay, 3_000));
@@ -129,7 +132,7 @@ test("a mid-turn downgrade to observe stops the next action, not the turn after"
   await expect(page.locator("#sga-root")).toHaveCount(1);
   const cutoff = new Date();
   await page.mouse.click(VIEW.width - 32, VIEW.height - 32);
-  await page.mouse.click(VIEW.width - 152, VIEW.height - 242);
+  await page.mouse.click(VIEW.width - 220, VIEW.height - 100);
   await page.keyboard.type("prove the downgrade lands before the next action");
   await page.keyboard.press("Enter");
   const turnId = await newestTurn(cutoff);

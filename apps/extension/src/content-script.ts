@@ -166,7 +166,10 @@ class Agent {
       case "sw:event": {
         this.panel.appendLine(describeEvent(message.event));
         const event = message.event;
-        if (event.kind === "action-request") this.panel.setActivity("running");
+        if (event.kind === "action-request") {
+          this.panel.setActivity("running");
+          this.panel.open();
+        }
         if (event.kind === "quota") this.panel.setQuota(event.quota);
         if (event.kind === "turn-end") this.panel.setActivity("idle");
         if (event.kind === "action-request" && event.needsConfirmation) {
@@ -183,6 +186,8 @@ class Agent {
         return;
       }
       case "sw:execute":
+        this.panel.setActivity("running");
+        this.panel.open();
         void this.execute(message);
         return;
       case "sw:error":
@@ -213,7 +218,6 @@ class Agent {
       observe: () => observe(document),
       diff: diffDigests,
       navigate: (path) => {
-        // Deferred so the action result posts before the page unloads.
         setTimeout(() => {
           location.assign(path);
         }, NAVIGATE_DELAY_MS);
@@ -222,6 +226,7 @@ class Agent {
         new Promise((resolve) => {
           setTimeout(resolve, ms);
         }),
+      preview: (element) => this.panel.highlightTarget(element),
     });
     const digest = message.action.kind === "navigate" ? null : captureDigest();
     this.post({

@@ -19,6 +19,7 @@ export interface ExecutorDeps {
   diff(before: PageDigest, after: PageDigest): DigestDelta;
   navigate(path: string): void;
   delay(ms: number): Promise<void>;
+  preview?(element: Element): Promise<void>;
 }
 
 const SETTLE_MS = 30;
@@ -53,8 +54,7 @@ function dispatchPointerSequence(element: Element): void {
   const win = realmOf(element);
   if (win === null) throw new Error("element has no window");
   const options = { bubbles: true, cancelable: true, composed: true };
-  const Pointer =
-    (win as { PointerEvent?: typeof PointerEvent }).PointerEvent ?? win.MouseEvent;
+  const Pointer = (win as { PointerEvent?: typeof PointerEvent }).PointerEvent ?? win.MouseEvent;
   element.dispatchEvent(new Pointer("pointerdown", options));
   element.dispatchEvent(new win.MouseEvent("mousedown", options));
   element.dispatchEvent(new Pointer("pointerup", options));
@@ -80,7 +80,11 @@ function dispatchValueEvents(element: Element, data: string): void {
   if (win === null) throw new Error("element has no window");
   const InputCtor = (win as { InputEvent?: typeof InputEvent }).InputEvent ?? win.Event;
   element.dispatchEvent(
-    new InputCtor("input", { bubbles: true, composed: true, ...(InputCtor === win.Event ? {} : { data }) }),
+    new InputCtor("input", {
+      bubbles: true,
+      composed: true,
+      ...(InputCtor === win.Event ? {} : { data }),
+    }),
   );
   element.dispatchEvent(new win.Event("change", { bubbles: true }));
 }
@@ -163,6 +167,10 @@ async function dispatch(action: AgentAction, deps: ExecutorDeps): Promise<Action
     return refusal("password_field", "the agent never operates a password field");
   }
 
+  if (deps.preview !== undefined && action.kind !== "readBack") {
+    await deps.preview(element);
+  }
+
   switch (action.kind) {
     case "click": {
       dispatchPointerSequence(element);
@@ -177,7 +185,9 @@ async function dispatch(action: AgentAction, deps: ExecutorDeps): Promise<Action
     case "select": {
       const select = element as HTMLSelectElement;
       const option = Array.from(select.options).find(
-        (candidate) => candidate.label.trim() === action.optionLabel || candidate.text.trim() === action.optionLabel,
+        (candidate) =>
+          candidate.label.trim() === action.optionLabel ||
+          candidate.text.trim() === action.optionLabel,
       );
       if (option === undefined) {
         return {

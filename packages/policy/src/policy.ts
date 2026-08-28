@@ -5,7 +5,10 @@ import {
   type Verdict,
 } from "@sga/contract/public";
 
-export function describeActionForConfirmation(action: AgentAction, adapterMatched: boolean): string {
+export function describeActionForConfirmation(
+  action: AgentAction,
+  adapterMatched: boolean,
+): string {
   const provenance = adapterMatched
     ? ""
     : " (working from what the agent can see, not a reviewed capability)";
@@ -46,6 +49,10 @@ export function evaluatePolicy(input: PolicyInput): Verdict {
   }
 
   if (input.risk === "read") {
+    return { kind: "proceed" };
+  }
+
+  if (input.risk === "write" && input.writeConsent && input.confirmation === null) {
     return { kind: "proceed" };
   }
 

@@ -29,7 +29,10 @@ test.beforeAll(async () => {
   const staged = stageExtension(["http://127.0.0.1/*"]);
   context = await launchWithExtension(staged);
   const worker = await serviceWorkerOf(context);
-  await worker.evaluate((base) => chrome.storage.local.set({ "sga.apiBase": base }), server.baseUrl);
+  await worker.evaluate(
+    (base) => chrome.storage.local.set({ "sga.apiBase": base }),
+    server.baseUrl,
+  );
   page = await context.newPage();
   await page.goto(`${app.origin}/settings/billing`);
   const popup = await context.newPage();
@@ -56,7 +59,7 @@ test("the agent completes a real task end to end against the fixture app", async
   const { width, height } = viewport as { width: number; height: number };
 
   await page.mouse.click(width - 32, height - 32);
-  await page.mouse.click(width - 152, height - 242);
+  await page.mouse.click(width - 220, height - 100);
   await page.keyboard.type("Read back this page's main heading and tell me what it says.");
   await page.keyboard.press("Enter");
 

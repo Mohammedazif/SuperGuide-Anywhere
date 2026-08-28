@@ -93,6 +93,16 @@ export function resolveStepAction(
   if (step.action === "navigate") {
     return { ok: true, value: { kind: "navigate", path: step.route } };
   }
+  if (step.action === "waitFor") {
+    return {
+      ok: true,
+      value: {
+        kind: "waitFor",
+        predicate: step.predicate,
+        timeoutMs: step.timeoutMs ?? 8000,
+      },
+    };
+  }
   const target = findTarget(digest, step.target);
   if (target === null) {
     return {

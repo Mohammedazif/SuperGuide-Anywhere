@@ -71,22 +71,39 @@ function Options(): JSX.Element {
                 <td>
                   {grant.tier === "observe" ? (
                     armedControl === grant.origin ? (
-                      <button onClick={() => { setTier(grant.origin, "control"); }}>
+                      <button
+                        onClick={() => {
+                          setTier(grant.origin, "control");
+                        }}
+                      >
                         Confirm control
                       </button>
                     ) : (
-                      <button onClick={() => { setArmedControl(grant.origin); }}>
+                      <button
+                        onClick={() => {
+                          setArmedControl(grant.origin);
+                        }}
+                      >
                         Enable control…
                       </button>
                     )
                   ) : (
-                    <button onClick={() => { setTier(grant.origin, "observe"); }}>
+                    <button
+                      onClick={() => {
+                        setTier(grant.origin, "observe");
+                      }}
+                    >
                       Drop to observe
                     </button>
                   )}
                 </td>
                 <td>
-                  <button class="danger" onClick={() => { deactivate(grant.origin); }}>
+                  <button
+                    class="danger"
+                    onClick={() => {
+                      deactivate(grant.origin);
+                    }}
+                  >
                     Deactivate
                   </button>
                 </td>

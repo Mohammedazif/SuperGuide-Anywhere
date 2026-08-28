@@ -21,6 +21,7 @@ function input(overrides: Partial<PolicyInput>): PolicyInput {
     adapterMatched: true,
     siteActivated: true,
     tier: "control",
+    writeConsent: false,
     confirmation: null,
     ...overrides,
   };
@@ -70,12 +71,28 @@ describe("evaluatePolicy", () => {
     );
   });
 
-  it("asks before a sensitive action, always", () => {
+  it("asks before a sensitive action, even after write consent", () => {
     expect(evaluatePolicy(input({ risk: "sensitive" })).kind).toBe("confirm");
+    expect(evaluatePolicy(input({ risk: "sensitive", writeConsent: true })).kind).toBe("confirm");
+  });
+
+  it("lets a later write proceed once the turn already has write consent", () => {
+    expect(evaluatePolicy(input({ writeConsent: true }))).toEqual({ kind: "proceed" });
+  });
+
+  it("does not let write consent override an observe grant", () => {
+    expect(evaluatePolicy(input({ tier: "observe", writeConsent: true }))).toEqual({
+      kind: "refuse",
+      reason: "grant_insufficient",
+    });
   });
 
   it("rejects a confirmation bound to a different action", () => {
-    const confirmation: Confirmation = { actionId: OTHER_ACTION_ID, paramsHash: HASH, approved: true };
+    const confirmation: Confirmation = {
+      actionId: OTHER_ACTION_ID,
+      paramsHash: HASH,
+      approved: true,
+    };
     expect(evaluatePolicy(input({ confirmation }))).toEqual({
       kind: "refuse",
       reason: "confirmation_mismatch",
@@ -83,7 +100,11 @@ describe("evaluatePolicy", () => {
   });
 
   it("rejects a confirmation whose paramsHash does not match the action being executed", () => {
-    const confirmation: Confirmation = { actionId: ACTION_ID, paramsHash: OTHER_HASH, approved: true };
+    const confirmation: Confirmation = {
+      actionId: ACTION_ID,
+      paramsHash: OTHER_HASH,
+      approved: true,
+    };
     expect(evaluatePolicy(input({ confirmation }))).toEqual({
       kind: "refuse",
       reason: "confirmation_mismatch",
@@ -145,7 +166,8 @@ describe("no input combination reaches proceed for a state-changing action under
         fc.constantFrom("read" as const, "write" as const, "sensitive" as const),
         fc.boolean(),
         confirmationArb,
-        (action, risk, adapterMatched, confirmation) => {
+        fc.boolean(),
+        (action, risk, adapterMatched, confirmation, writeConsent) => {
           const verdict = evaluatePolicy({
             actionId: ACTION_ID,
             action,
@@ -154,6 +176,7 @@ describe("no input combination reaches proceed for a state-changing action under
             adapterMatched,
             siteActivated: true,
             tier: "observe",
+            writeConsent,
             confirmation,
           });
           expect(verdict).toEqual({ kind: "refuse", reason: "grant_insufficient" });

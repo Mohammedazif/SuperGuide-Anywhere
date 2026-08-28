@@ -80,6 +80,7 @@ interface Verification {
   lastVerified: string | null;
   lastFailedPredicate: ExpectPredicate | null;
   lastAttemptFailed: boolean;
+  writeConsent: boolean;
 }
 
 type TurnEnd = "completed" | "failed" | "needs-input";
@@ -98,18 +99,20 @@ export class TurnAgent {
   }
 
   start(input: TurnInput): void {
-    void this.run(input).catch(async (cause: unknown) => {
-      const message = cause instanceof Error ? cause.message : String(cause);
-      await this.deps.store.appendTrajectory(input.turnId, "error", { message });
-      await this.deps.store.appendEvent(input.turnId, {
-        kind: "report",
-        outcome: "not-completed",
-        detail: "the agent stopped on an internal error; nothing further was done",
-        failedPredicate: null,
-        lastVerifiedState: null,
-      });
-      await this.endTurn(input, "failed");
-    }).catch(() => undefined);
+    void this.run(input)
+      .catch(async (cause: unknown) => {
+        const message = cause instanceof Error ? cause.message : String(cause);
+        await this.deps.store.appendTrajectory(input.turnId, "error", { message });
+        await this.deps.store.appendEvent(input.turnId, {
+          kind: "report",
+          outcome: "not-completed",
+          detail: "the agent stopped on an internal error; nothing further was done",
+          failedPredicate: null,
+          lastVerifiedState: null,
+        });
+        await this.endTurn(input, "failed");
+      })
+      .catch(() => undefined);
   }
 
   async run(input: TurnInput): Promise<void> {
@@ -118,12 +121,10 @@ export class TurnAgent {
     const scan = await this.deps
       .scan(extractPageStrings(input.digest))
       .then((verdict) => injectionScanSchema.parse(verdict))
-      .catch(
-        (): InjectionScan => ({
-          suspicious: true,
-          findings: ["the injection scan was unavailable; treating the page as suspect"],
-        }),
-      );
+      .catch((): InjectionScan => ({
+        suspicious: true,
+        findings: ["the injection scan was unavailable; treating the page as suspect"],
+      }));
     await store.appendTrajectory(input.turnId, "injection-scan", scan);
 
     let digest: PageDigest | null = input.digest;
@@ -131,6 +132,7 @@ export class TurnAgent {
       lastVerified: null,
       lastFailedPredicate: null,
       lastAttemptFailed: false,
+      writeConsent: false,
     };
 
     const messages: Anthropic.Beta.Messages.BetaMessageParam[] = [
@@ -160,9 +162,10 @@ export class TurnAgent {
       });
 
       if (response.stop_reason === "refusal") {
-        const category = response.stop_details?.type === "refusal"
-          ? (response.stop_details.category ?? null)
-          : null;
+        const category =
+          response.stop_details?.type === "refusal"
+            ? (response.stop_details.category ?? null)
+            : null;
         await store.appendTrajectory(input.turnId, "refusal", { source: "model", category });
         await store.appendEvent(input.turnId, {
           kind: "refusal",
@@ -302,7 +305,11 @@ export class TurnAgent {
     const { store } = this.deps;
     const parsed = pageActionInputSchema.safeParse(toolUse.input);
     if (!parsed.success) {
-      return { content: `invalid page_action input: ${parsed.error.message}`, isError: true, digest: null };
+      return {
+        content: `invalid page_action input: ${parsed.error.message}`,
+        isError: true,
+        digest: null,
+      };
     }
     const { action, expect, summary } = parsed.data;
     const actionId = crypto.randomUUID();
@@ -324,6 +331,7 @@ export class TurnAgent {
       adapterMatched: false,
       siteActivated: true,
       tier: input.tier,
+      writeConsent: verification.writeConsent,
       confirmation: null,
     });
     await store.appendTrajectory(input.turnId, "policy-verdict", { actionId, verdict });
@@ -359,6 +367,7 @@ export class TurnAgent {
         adapterMatched: false,
         siteActivated: true,
         tier: input.tier,
+        writeConsent: verification.writeConsent,
         confirmation,
       });
       await store.appendTrajectory(input.turnId, "policy-verdict", {
@@ -383,6 +392,8 @@ export class TurnAgent {
         digest: null,
       };
     }
+
+    if (risk !== "read") verification.writeConsent = true;
 
     const delivered = await this.dispatch(input, action, risk, summary, expect, actionId);
     if (delivered === null) {
@@ -469,6 +480,7 @@ export class TurnAgent {
       adapterMatched: true,
       siteActivated: true,
       tier: input.tier,
+      writeConsent: verification.writeConsent,
       confirmation: null,
     });
     await store.appendTrajectory(input.turnId, "policy-verdict", {
@@ -513,6 +525,7 @@ export class TurnAgent {
         adapterMatched: true,
         siteActivated: true,
         tier: input.tier,
+        writeConsent: verification.writeConsent,
         confirmation,
       });
       await store.appendTrajectory(input.turnId, "policy-verdict", {
@@ -540,6 +553,8 @@ export class TurnAgent {
         digest: null,
       };
     }
+
+    if (capability.risk !== "read") verification.writeConsent = true;
 
     let current = digest;
     const stepResults: { step: string; status: string }[] = [];
@@ -695,6 +710,7 @@ export class TurnAgent {
       adapterMatched: true,
       siteActivated: true,
       tier: input.tier,
+      writeConsent: verification.writeConsent,
       confirmation: null,
     });
     await store.appendTrajectory(input.turnId, "policy-verdict", { actionId, verdict });
@@ -713,14 +729,7 @@ export class TurnAgent {
         digest: null,
       };
     }
-    const delivered = await this.dispatch(
-      input,
-      action,
-      "read",
-      `Go to ${route.id}`,
-      [],
-      actionId,
-    );
+    const delivered = await this.dispatch(input, action, "read", `Go to ${route.id}`, [], actionId);
     if (delivered === null) {
       verification.lastAttemptFailed = true;
       return {
@@ -892,6 +901,12 @@ function representativeAction(capability: AdapterCapability): AgentAction {
       return { kind: "select", target: placeholder, optionLabel: "?" };
     case "check":
       return { kind: "check", target: placeholder, checked: step.checked };
+    case "waitFor":
+      return {
+        kind: "waitFor",
+        predicate: step.predicate,
+        timeoutMs: step.timeoutMs ?? 8000,
+      };
     default: {
       const exhausted: never = step;
       throw new Error(`unreachable step ${JSON.stringify(exhausted)}`);

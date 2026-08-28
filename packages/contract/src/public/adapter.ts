@@ -28,6 +28,11 @@ export const adapterStepSchema = z.discriminatedUnion("action", [
     checked: z.boolean(),
   }),
   z.strictObject({ action: z.literal("navigate"), route: z.string().startsWith("/") }),
+  z.strictObject({
+    action: z.literal("waitFor"),
+    predicate: expectPredicateSchema,
+    timeoutMs: z.number().int().min(100).max(30_000).optional(),
+  }),
 ]);
 export type AdapterStep = z.infer<typeof adapterStepSchema>;
 

@@ -175,9 +175,10 @@ describe("action results", () => {
     const second = await api("/v1/action-result", { method: "POST", body });
     expect(first.status).toBe(204);
     expect(second.status).toBe(204);
-    const stored = await server.pool.query("SELECT count(*) FROM action_result WHERE action_id = $1", [
-      actionId,
-    ]);
+    const stored = await server.pool.query(
+      "SELECT count(*) FROM action_result WHERE action_id = $1",
+      [actionId],
+    );
     expect(stored.rows[0]).toEqual({ count: "1" });
     const steps = await server.pool.query(
       "SELECT count(*) FROM trajectory WHERE turn_id = $1 AND kind = 'action-result'",
@@ -197,5 +198,15 @@ describe("origin validation", () => {
       headers: { origin: "https://evil.example", "x-sga-device-token": token },
     });
     expect(wrongOrigin.status).toBe(403);
+  });
+
+  it("accepts the extension origin header when Origin is absent", async () => {
+    const response = await fetch(`${server.baseUrl}/v1/quota`, {
+      headers: {
+        "x-sga-extension-origin": TEST_EXTENSION_ORIGIN,
+        "x-sga-device-token": token,
+      },
+    });
+    expect(response.status).toBe(200);
   });
 });

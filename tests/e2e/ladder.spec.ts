@@ -61,7 +61,11 @@ function approveAll(turnId: string): { stop: () => void; askedOnce: () => boolea
         .query<{
           payload: { kind: string; needsConfirmation?: boolean; actionId?: string };
         }>("SELECT payload FROM turn_event WHERE turn_id = $1 ORDER BY seq", [turnId])
-        .catch(() => ({ rows: [] as { payload: { kind: string; needsConfirmation?: boolean; actionId?: string } }[] }));
+        .catch(() => ({
+          rows: [] as {
+            payload: { kind: string; needsConfirmation?: boolean; actionId?: string };
+          }[],
+        }));
       for (const row of rows.rows) {
         const event = row.payload;
         if (event.kind !== "action-request" || event.needsConfirmation !== true) continue;
@@ -79,7 +83,7 @@ function approveAll(turnId: string): { stop: () => void; askedOnce: () => boolea
         const viewport = page.viewportSize();
         if (viewport === null) continue;
         await new Promise((resolveDelay) => setTimeout(resolveDelay, 750));
-        await page.mouse.click(viewport.width - 220, viewport.height - 83).catch(() => undefined);
+        await page.mouse.click(viewport.width - 280, viewport.height - 152).catch(() => undefined);
       }
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
     }
@@ -115,7 +119,7 @@ async function startPanelTask(text: string): Promise<void> {
   expect(viewport).not.toBeNull();
   const { width, height } = viewport as { width: number; height: number };
   await page.mouse.click(width - 32, height - 32);
-  await page.mouse.click(width - 152, height - 242);
+  await page.mouse.click(width - 220, height - 100);
   await page.keyboard.type(text);
   await page.keyboard.press("Enter");
 }
@@ -127,7 +131,10 @@ test.beforeAll(async () => {
   const staged = stageExtension(["http://127.0.0.1/*"]);
   context = await launchWithExtension(staged);
   const worker = await serviceWorkerOf(context);
-  await worker.evaluate((base) => chrome.storage.local.set({ "sga.apiBase": base }), server.baseUrl);
+  await worker.evaluate(
+    (base) => chrome.storage.local.set({ "sga.apiBase": base }),
+    server.baseUrl,
+  );
   page = await context.newPage();
   await page.goto(`${app.origin}/settings/team`);
   const popup = await context.newPage();
@@ -177,9 +184,7 @@ test("L2: the reviewed route takes the page to billing", async () => {
   expect(status).toBe("completed");
   expect(await reportOutcome(turnId)).toBe("completed");
   expect(await plannedLevels(turnId)).toContain("L2");
-  await expect
-    .poll(() => page.url(), { timeout: 15_000 })
-    .toContain("/settings/billing");
+  await expect.poll(() => page.url(), { timeout: 15_000 }).toContain("/settings/billing");
 });
 
 test("L3 on variant B: the same grounded mechanism survives different markup", async () => {

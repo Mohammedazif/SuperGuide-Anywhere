@@ -1,7 +1,62 @@
 import type { AgentAction, PageDigest, RiskClass } from "@sga/contract/public";
 
-const SENSITIVE_NAME =
-  /\b(delete|remove|pay|payment|purchase|buy|checkout|transfer|invite|revoke|grant|cancel|deactivate|close|terminate|password|permission|billing|refund|subscribe|unsubscribe|plan|card|bank|wire)\b/i;
+export const SENSITIVE_TERMS: readonly string[] = [
+  "2fa",
+  "archive",
+  "bank",
+  "billing",
+  "buy",
+  "cancel",
+  "card",
+  "charge",
+  "checkout",
+  "close",
+  "credential",
+  "deactivate",
+  "delete",
+  "destroy",
+  "downgrade",
+  "erase",
+  "grant",
+  "iban",
+  "impersonate",
+  "invoice",
+  "invite",
+  "merge",
+  "mfa",
+  "overwrite",
+  "owner",
+  "password",
+  "pay",
+  "payment",
+  "payout",
+  "permanently",
+  "permission",
+  "plan",
+  "production",
+  "purchase",
+  "purge",
+  "recovery",
+  "refund",
+  "remove",
+  "reset",
+  "revoke",
+  "role",
+  "sepa",
+  "ssn",
+  "subscribe",
+  "suspend",
+  "tax",
+  "terminate",
+  "totp",
+  "transfer",
+  "unsubscribe",
+  "upgrade",
+  "wipe",
+  "wire",
+];
+
+const SENSITIVE_NAME = new RegExp(`\\b(?:${SENSITIVE_TERMS.join("|")})\\b`, "i");
 
 function targetName(id: string, digest: PageDigest | null): string | null {
   if (digest === null) return null;
@@ -23,9 +78,6 @@ export function classifyRisk(action: AgentAction, digest: PageDigest | null): Ri
     case "select":
     case "check": {
       const name = targetName(action.target.id, digest);
-      // A target the digest cannot name is unclassifiable, and unclassified means
-      // sensitive, never read. Page-derived names may only raise risk, never lower
-      // it below the write floor.
       if (name === null) return "sensitive";
       return SENSITIVE_NAME.test(name) ? "sensitive" : "write";
     }

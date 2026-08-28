@@ -18,11 +18,18 @@ import { StreamSequencer } from "./sequencer";
 import { TransportFailure } from "./errors";
 
 const TOKEN_HEADER = "x-sga-device-token";
+const EXTENSION_ORIGIN_HEADER = "x-sga-extension-origin";
 
 export interface ClientConfig {
   baseUrl: string;
   getToken(): Promise<string>;
   refreshToken(): Promise<string>;
+  extensionOrigin?: string;
+}
+
+function originHeaders(extensionOrigin: string | undefined): Record<string, string> {
+  if (extensionOrigin === undefined) return {};
+  return { [EXTENSION_ORIGIN_HEADER]: extensionOrigin };
 }
 
 export interface StreamHandlers {
@@ -57,12 +64,13 @@ async function parseFailure(response: Response): Promise<TransportFailure> {
 export async function registerDevice(
   baseUrl: string,
   deviceId: string,
+  extensionOrigin?: string,
 ): Promise<{ sessionToken: string; expiresAt: string }> {
   let response: Response;
   try {
     response = await fetch(`${baseUrl}/v1/device`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", ...originHeaders(extensionOrigin) },
       body: JSON.stringify({ deviceId }),
     });
   } catch (cause) {
@@ -94,6 +102,7 @@ export class ControlPlaneClient {
         method: init.method,
         headers: {
           [TOKEN_HEADER]: token,
+          ...originHeaders(this.config.extensionOrigin),
           ...(init.body === undefined ? {} : { "content-type": "application/json" }),
         },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),
@@ -179,7 +188,10 @@ export class ControlPlaneClient {
         const token = await this.config.getToken();
         response = await fetch(
           `${this.config.baseUrl}/v1/stream?turnId=${turnId}&after=${sequencer.lastSeq}`,
-          { headers: { [TOKEN_HEADER]: token }, signal },
+          {
+            headers: { [TOKEN_HEADER]: token, ...originHeaders(this.config.extensionOrigin) },
+            signal,
+          },
         );
       } catch {
         if (aborted()) break;
