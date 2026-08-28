@@ -37,9 +37,7 @@ function openedInTopLayer(event: Event): boolean {
   return "newState" in event && (event as ToggleEvent).newState === "open";
 }
 
-// The closed shadow tree paints atomically with the host. z-index on badge/panel
-// cannot escape that, so the host itself must sit at the top of the page stack.
-// Native dialogs still win via the top layer; popover puts us in that layer too.
+// Closed-shadow children cannot outrank the host; popover is how we beat native dialogs.
 export function promoteHost(host: HTMLElement, forceRestack: boolean): void {
   if (!host.isConnected || !popoverSupported(host)) return;
   tryPopover(() => {

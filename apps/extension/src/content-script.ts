@@ -226,9 +226,7 @@ class Agent {
   }
 
   private async execute(message: ExecuteMessage): Promise<void> {
-    // The stored grant, read at execution time, outranks the tier the worker
-    // sent: a mid-turn downgrade or revocation must stop this action, and the
-    // executor must refuse even if the server wrongly permitted it.
+    // Stored grant at execute time outranks worker tier; mid-turn revoke/downgrade must refuse.
     const grant = await grantFor(location.origin);
     const tier: GrantTier = grant?.tier ?? "observe";
     const result = await executeAction(message.action, tier, {

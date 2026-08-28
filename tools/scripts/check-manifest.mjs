@@ -4,8 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-// The permission set is a product commitment, not a configuration. Adding a permission
-// must edit this list deliberately, in the same change, in review.
+// Permission set is a product commitment; adding one must edit this list in the same change.
 const EXPECTED_PERMISSIONS = ["activeTab", "scripting", "storage"];
 const EXPECTED_OPTIONAL_HOSTS = ["*://*/*"];
 const FORBIDDEN_KEYS = ["host_permissions", "content_scripts", "web_accessible_resources"];

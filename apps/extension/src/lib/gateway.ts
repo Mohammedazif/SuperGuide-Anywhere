@@ -29,8 +29,7 @@ interface PortContext {
 
 export class AgentGateway {
   private readonly ports = new Map<number, chrome.runtime.Port>();
-  // A message posted while a tab is navigating would vanish with its port; it
-  // parks here and flushes when the freshly injected content script says hello.
+  // Park outbound messages while the tab is navigating; flush on the next cs:hello.
   private readonly parked = new Map<number, WorkerToContentMessage[]>();
   private readonly sessions = new TurnSessionManager(
     createApiClient,
@@ -288,8 +287,7 @@ export class AgentGateway {
       case "ui:erase": {
         const client = await createApiClient();
         await client.eraseDevice();
-        // A fresh anonymous identity is generated on next use; the erased one
-        // never comes back.
+        // Erased device id never returns; a new anonymous id is generated on next use.
         await chrome.storage.local.remove(STORAGE_KEYS.deviceId);
         return { type: "reply:ok" };
       }
@@ -324,8 +322,7 @@ export class AgentGateway {
         this.teardownOrigin(message.origin);
         const grants = await removeGrant(message.origin);
         await syncContentScripts(grants);
-        // An install-time-held host (the e2e staging manifest) cannot be removed; the
-        // grant record is the product's source of truth and is already gone either way.
+        // Install-time hosts (e2e staging) cannot be removed; grant record is already gone.
         await chrome.permissions
           .remove({ origins: [originPattern(message.origin)] })
           .catch(() => false);

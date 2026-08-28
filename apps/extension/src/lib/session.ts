@@ -126,8 +126,7 @@ export class TurnSessionManager {
               event,
             });
             if (event.kind === "action-request" && !event.needsConfirmation) {
-              // The tier is read at dispatch time, not turn start, so a mid-turn
-              // downgrade to observe stops the next action.
+              // Read tier at dispatch, not turn start, so a mid-turn observe downgrade stops.
               const tier = await this.tierFor(record.origin);
               if (tier === null) return;
               const execute: WorkerToContentMessage = {

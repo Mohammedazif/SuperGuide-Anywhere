@@ -1,6 +1,4 @@
-// The cache subpath carries no YAML machinery: the loader's parser is a Node
-// library whose CJS shims die inside a service worker, and the extension never
-// parses adapter files anyway — it only stores what the server serves.
+// Cache-only import: YAML loader is Node/CJS and dies in a service worker.
 import { pickAdapterSet } from "@sga/adapters/cache";
 import { STORAGE_KEYS, adapterCacheSchema, type AdapterSet } from "@sga/contract/public";
 import { createApiClient } from "./api";

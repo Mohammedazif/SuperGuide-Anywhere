@@ -26,9 +26,7 @@ if (leaks.length > 0) {
   process.exit(1);
 }
 
-// A CommonJS shim like __require("process") throws at module scope in a service
-// worker and silently kills it. Any node-flavoured require surviving the bundle
-// is a packaging failure, caught here rather than by a dead extension.
+// Unbundled __require() throws at service-worker module scope and kills the extension.
 const nodeRequire = /__require\d*\(\s*["'][a-z:_/-]+["']\s*\)/;
 const cjsLeaks = bundles.filter((file) =>
   nodeRequire.test(readFileSync(join(BUNDLE_DIR, file), "utf8")),

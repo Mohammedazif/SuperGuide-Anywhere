@@ -33,8 +33,7 @@ const RULES = [
     id: "csp-manipulation",
     description: "Any read or write of a Content-Security-Policy header",
     pattern: /content-security-policy|modifyHeaders/i,
-    // apps/fixture-app stands in for an arbitrary website. It serves a strict policy so the
-    // extension can be proved to work under one. The product itself never touches the header.
+    // fixture-app serves a CSP so the extension can be proved under one; product never touches it.
     exclude: [/^apps\/fixture-app\//],
   },
   {

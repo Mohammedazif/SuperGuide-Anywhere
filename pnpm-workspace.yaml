@@ -3,11 +3,7 @@ packages:
   - "apps/*"
   - "tools/eslint-plugin-sga"
 
-# esbuild ships a platform-specific binary that its install script links into place, and
-# vitest, tsx, and tsup all need it. Approving the build deliberately is what keeps a clean
-# `pnpm install --frozen-lockfile` from failing on ERR_PNPM_IGNORED_BUILDS.
-# @google/genai and protobufjs postinstall scripts are codegen/telemetry helpers the
-# SDKs run fine without; declining them keeps the install surface minimal.
+# Allow esbuild (ERR_PNPM_IGNORED_BUILDS); decline unused genai/protobufjs postinstalls.
 allowBuilds:
   '@google/genai': false
   esbuild: true

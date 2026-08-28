@@ -4,8 +4,6 @@ export function pickAdapterSet(
   cached: AdapterSet | null,
   fetched: AdapterSet | null,
 ): AdapterSet | null {
-  // The server's set always wins when it answered, even against a cached set
-  // with a higher version: a cached adapter newer than the server's is
-  // discarded, never preferred. The cache exists only to survive a failed fetch.
+  // Fetched always wins, even over a higher cached version; cache is fetch-failure fallback only.
   return fetched ?? cached;
 }

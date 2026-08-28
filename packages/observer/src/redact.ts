@@ -7,9 +7,7 @@ export interface ValueCandidate {
   value: string;
 }
 
-// The allowlist is matched on the field's accessible name, lowercased. The default
-// allowlist is empty: no field value leaves the page unless a caller asked for that
-// field by name. A password field's value never leaves, allowlisted or not.
+// Allowlist matches accessible name (lowercase, empty by default); password values never leave.
 export function redactedValue(
   candidate: ValueCandidate,
   allowlist: ReadonlySet<string>,

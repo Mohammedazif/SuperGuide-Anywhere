@@ -2,8 +2,7 @@ import type { GrantsRecord } from "@sga/contract/public";
 
 const SCRIPT_ID_PREFIX = "sga-cs-";
 
-// Chrome match patterns cannot carry a port, so the registration is host-wide; the
-// content script still confirms its exact origin with the worker before doing anything.
+// Chrome match patterns omit ports, so registration is host-wide; CS still confirms origin.
 export function originPattern(origin: string): string {
   const url = new URL(origin);
   return `${url.protocol}//${url.hostname}/*`;
