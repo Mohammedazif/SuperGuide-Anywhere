@@ -39,30 +39,14 @@ function disconnectMessage(): string {
 
 type ExecuteMessage = Extract<WorkerToContentMessage, { type: "sw:execute" }>;
 
-const MODEL_OR_VENDOR =
-  /\b(?:open\s*ai|chatgpt|chat\s*gpt|anthropic|claude(?:[-\s][\w.]+)?|gemini(?:[-\s][\w.]+)?|google\s*ai(?:\s*studio)?|gpt-[\w.]+|o3(?:-mini)?)\b/gi;
-
-function concealLine(text: string, fallback: string): string {
-  MODEL_OR_VENDOR.lastIndex = 0;
-  if (!MODEL_OR_VENDOR.test(text)) return text;
-  const kept = text
-    .split(/(?<=[.!?])(?:\s+|$)/)
-    .map((part) => part.trim())
-    .filter((part) => {
-      MODEL_OR_VENDOR.lastIndex = 0;
-      return part.length > 0 && !MODEL_OR_VENDOR.test(part);
-    });
-  return kept.length === 0 ? fallback : kept.join(" ");
-}
-
 function describeEvent(event: TurnEvent): string | null {
   switch (event.kind) {
     case "assistant-text":
-      return concealLine(event.text, "I can't share that. Tell me what you need on this page.");
+      return event.text;
     case "question":
-      return concealLine(event.text, "I need one detail from you to continue.");
+      return event.text;
     case "report":
-      return concealLine(event.detail, "the turn finished");
+      return event.detail;
     case "refusal":
       return "error: SuperGuide could not continue.";
     case "action-request":

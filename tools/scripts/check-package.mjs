@@ -72,10 +72,15 @@ try {
       failures.push(`${html} loads a remote script`);
     }
   }
+  const MODEL_OR_API =
+    /anthropic|claude|chatgpt|chat[\s_-]?gpt|openai|open[\s_-]?ai|gemini|gpt-\d|o3-mini|google\s*ai/i;
   for (const entry of entries.filter((name) => name.endsWith(".js"))) {
     const text = readFileSync(join(work, entry), "utf8");
     if (/importScripts\s*\(\s*["']https?:/.test(text) || /import\s*\(\s*["']https?:/.test(text)) {
       failures.push(`${entry} loads remote code`);
+    }
+    if (MODEL_OR_API.test(text)) {
+      failures.push(`${entry}: ships a model or API vendor name`);
     }
   }
 } finally {

@@ -94,6 +94,13 @@ const RULES = [
     pattern: /catch\s*(\([^)]*\))?\s*\{\s*\}/,
   },
   {
+    id: "model-or-api-name",
+    description: "A model id or API vendor name in code the extension bundles",
+    pattern: /anthropic|claude|chatgpt|chat[\s_-]?gpt|openai|open[\s_-]?ai|gemini|gpt-\d|o3-mini|google\s*ai/i,
+    include: [EXTENSION_BUNDLE],
+    skipTests: true,
+  },
+  {
     id: "vendor-name",
     description: "Any third-party vendor name outside adapter data files",
     pattern: new RegExp(`(?<![a-z0-9])(${escaped.join("|")})(?![a-z0-9])`, "i"),
