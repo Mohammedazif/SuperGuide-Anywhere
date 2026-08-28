@@ -1,11 +1,25 @@
 # Local Testing Guide for SuperGuide Anywhere
 
-To test the SuperGuide Anywhere extension locally in your Chrome browser, you'll need to load the extension itself and spin up the local control plane (backend) that it talks to.
+The extension is a client. The backend is SuperGuide’s control plane, on
+`/v1/anywhere`. Run the two from adjacent checkouts.
 
-Here is the step-by-step guide to get everything running:
+## 1. SuperGuide control plane
 
-## 1. Build the Extension
-First, make sure the extension code is built into the `dist` directory:
+```bash
+cd /home/spidewol/Documents/Support-agent/superguide
+pnpm install
+pnpm env:init                 # generates SG_* keys; fill the model provider key
+# Add your unpacked extension origin, e.g.:
+# SG_ALLOWED_EXTENSION_IDS=chrome-extension://<id from chrome://extensions>
+pnpm db:start                 # or: docker compose up -d
+pnpm db:migrate
+pnpm --filter @superguide/control-plane run dev
+```
+
+The server listens on `http://127.0.0.1:8080`. Widget routes stay on `/v1`.
+Extension routes are `/v1/anywhere/*`.
+
+## 2. Build and load the extension
 
 ```bash
 cd /home/spidewol/Documents/Support-agent/superguide-anywhere
@@ -13,44 +27,29 @@ pnpm install
 pnpm run build
 ```
 
-## 2. Load the Extension into Chrome
-1. Open Chrome and navigate to `chrome://extensions/`.
-2. Toggle **Developer mode** on in the top-right corner.
-3. Click the **Load unpacked** button in the top-left corner.
-4. Select the built directory located at: `/home/spidewol/Documents/Support-agent/superguide-anywhere/apps/extension/dist`.
-5. Once loaded, you will see a new extension card for "SuperGuide Anywhere". **Copy the extension ID** from this card (a long string like `ghdcebndlanhmdeajdbbemcaihpenhoj`).
+1. Open Chrome at `chrome://extensions/`.
+2. Enable **Developer mode**.
+3. **Load unpacked** → `apps/extension/dist`.
+4. Copy the extension ID (for `SG_ALLOWED_EXTENSION_IDS` above). Reload the
+   control plane after you add it.
 
-## 3. Start the Local Control Plane
-The extension requires the backend service to make decisions and track quota.
+## 3. Point the extension at SuperGuide
 
-1. Open your `.env` file at the root of the project and add your new extension ID (using the format `chrome-extension://<YOUR_ID>`) so the server allows it to connect:
-   ```env
-   SGA_ALLOWED_EXTENSION_IDS=chrome-extension://your_copied_extension_id_here
-   ```
-2. Start the local PostgreSQL database using Docker:
-   ```bash
-   # If docker is not installed, install it first: sudo apt update && sudo apt install -y docker.io docker-compose-v2
-   docker compose up -d
-   ```
-3. Run the database migrations to set up the schema:
-   ```bash
-   pnpm run db:migrate
-   ```
-4. Start the control plane server:
-   ```bash
-   node --env-file-if-exists=.env --import tsx apps/control-plane/src/main.ts
-   ```
+Default `sga.apiBase` is `http://127.0.0.1:8080`. Paths are prefixed
+`/v1/anywhere` in the client, so you do **not** put `/v1/anywhere` in
+`apiBase`.
 
-## 4. Point the Extension to your Local Server
-By default, the extension points to the production URL (`https://api.superguideanywhere.com`). To point it to your local server instead:
+If you need to set it by hand, open the service-worker DevTools and run:
 
-1. Go back to `chrome://extensions/`.
-2. Find the SuperGuide Anywhere card and click **service worker** to open its DevTools console.
-3. Run this snippet in the console to configure the local API URL:
-   ```javascript
-   chrome.storage.local.set({ 'sga.apiBase': 'http://127.0.0.1:8080' })
-   ```
-4. Reload the extension using the refresh icon on its card in `chrome://extensions/`.
+```javascript
+chrome.storage.local.set({ 'sga.apiBase': 'http://127.0.0.1:8080' })
+```
 
-You should now be able to click on the SuperGuide Anywhere extension icon on any webpage to interact with it, with everything running entirely on your machine!
+Then reload the extension.
 
+## Playwright e2e
+
+E2E spawns SuperGuide from `../superguide` (override with `SUPERGUIDE_ROOT`)
+and talks to SuperGuide’s Postgres (`SG_DATABASE_URL`, default
+`postgres://sg_app:sg_app_dev@127.0.0.1:55432/superguide`). Start SuperGuide’s
+database and migrate before `pnpm test:e2e`.

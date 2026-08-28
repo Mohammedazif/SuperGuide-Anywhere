@@ -52,5 +52,6 @@ jobs:
       - run: pnpm build
       - run: pnpm test:integration
       - run: pnpm test:security
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      # Extension e2e now talks to SuperGuide's control plane (/v1/anywhere).
+      # Playwright against this repo's in-tree server is retired; run e2e from
+      # a SuperGuide checkout, or after the monorepo move.

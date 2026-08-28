@@ -8,7 +8,7 @@ import {
 } from "./helpers/launch";
 import { spawnControlPlane, type ControlPlaneProcess } from "./helpers/control-plane-process";
 import { spawnFixtureApp, type FixtureAppProcess } from "./helpers/fixture-app-process";
-import { appDatabaseUrl } from "../helpers/db";
+import { superGuideAppDatabaseUrl } from "./helpers/control-plane-process";
 import { liveProvider } from "../helpers/live";
 
 const live = liveProvider();
@@ -23,7 +23,7 @@ let page: Page;
 let pool: pg.Pool;
 
 test.beforeAll(async () => {
-  pool = new pg.Pool({ connectionString: appDatabaseUrl() });
+  pool = new pg.Pool({ connectionString: superGuideAppDatabaseUrl() });
   server = await spawnControlPlane({ agentLoop: "on" });
   app = await spawnFixtureApp();
   const staged = stageExtension(["http://127.0.0.1/*"]);

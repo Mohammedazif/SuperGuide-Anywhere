@@ -2,14 +2,14 @@ import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { paramsHashOf, type AgentAction } from "@sga/contract/public";
 import { TurnStore } from "../../../apps/control-plane/src/turn/store";
-import { appDatabaseUrl } from "../../helpers/db";
+import { superGuideAppDatabaseUrl } from "./control-plane-process";
 
 const [turnId, path] = process.argv.slice(2);
 if (turnId === undefined || path === undefined) {
   process.stderr.write("usage: emit-action.ts <turnId> <path>\n");
   process.exit(2);
 }
-const pool = new pg.Pool({ connectionString: appDatabaseUrl() });
+const pool = new pg.Pool({ connectionString: superGuideAppDatabaseUrl() });
 const store = new TurnStore(pool);
 const action: AgentAction = { kind: "navigate", path };
 const actionId = randomUUID();

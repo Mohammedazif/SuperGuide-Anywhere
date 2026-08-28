@@ -48,7 +48,7 @@ The daily allowance is metered per device id, and the device id is an anonymous
 identity is not a security boundary and the code does not pretend it is. Two mitigations
 bound the abuse, not eliminate it: a second usage bucket counted per client IP per UTC day
 (`SGA_DAILY_IP_QUOTA`), stored as a salted hash and expired daily, and rate-limited device
-registration per IP on `/v1/device`. A reinstall loop from one machine therefore hits the
+registration per IP on `/v1/anywhere/device`. A reinstall loop from one machine therefore hits the
 IP ceiling rather than yielding unlimited use, while a patient adversary rotating addresses
 still gets more than one device's share.
 

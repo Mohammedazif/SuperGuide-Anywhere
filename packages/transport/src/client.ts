@@ -19,6 +19,7 @@ import { TransportFailure } from "./errors";
 
 const TOKEN_HEADER = "x-sga-device-token";
 const EXTENSION_ORIGIN_HEADER = "x-sga-extension-origin";
+const API_PREFIX = "/v1/anywhere";
 
 export interface ClientConfig {
   baseUrl: string;
@@ -68,7 +69,7 @@ export async function registerDevice(
 ): Promise<{ sessionToken: string; expiresAt: string }> {
   let response: Response;
   try {
-    response = await fetch(`${baseUrl}/v1/device`, {
+    response = await fetch(`${baseUrl}${API_PREFIX}/device`, {
       method: "POST",
       headers: { "content-type": "application/json", ...originHeaders(extensionOrigin) },
       body: JSON.stringify({ deviceId }),
@@ -136,7 +137,7 @@ export class ControlPlaneClient {
   }
 
   async startTask(request: TaskRequest): Promise<{ turnId: string; quota: Quota }> {
-    return this.requestParsed("/v1/task", { method: "POST", body: request }, taskResponseSchema);
+    return this.requestParsed(`${API_PREFIX}/task`, { method: "POST", body: request }, taskResponseSchema);
   }
 
   async postActionResult(input: {
@@ -145,7 +146,7 @@ export class ControlPlaneClient {
     result: ActionResult;
     digest: PageDigest | null;
   }): Promise<void> {
-    const response = await this.request("/v1/action-result", { method: "POST", body: input });
+    const response = await this.request(`${API_PREFIX}/action-result`, { method: "POST", body: input });
     if (!response.ok) throw await parseFailure(response);
   }
 
@@ -155,21 +156,21 @@ export class ControlPlaneClient {
     paramsHash: string;
     approved: boolean;
   }): Promise<void> {
-    const response = await this.request("/v1/confirm", { method: "POST", body: input });
+    const response = await this.request(`${API_PREFIX}/confirm`, { method: "POST", body: input });
     if (!response.ok) throw await parseFailure(response);
   }
 
   async fetchQuota(): Promise<Quota> {
-    const parsed = await this.requestParsed("/v1/quota", { method: "GET" }, quotaResponseSchema);
+    const parsed = await this.requestParsed(`${API_PREFIX}/quota`, { method: "GET" }, quotaResponseSchema);
     return parsed.quota;
   }
 
   async fetchAdapters(): Promise<AdapterSet> {
-    return this.requestParsed("/v1/adapters", { method: "GET" }, adaptersResponseSchema);
+    return this.requestParsed(`${API_PREFIX}/adapters`, { method: "GET" }, adaptersResponseSchema);
   }
 
   async eraseDevice(): Promise<void> {
-    const response = await this.request("/v1/erase", { method: "POST" });
+    const response = await this.request(`${API_PREFIX}/erase`, { method: "POST" });
     if (!response.ok) throw await parseFailure(response);
   }
 
@@ -187,7 +188,7 @@ export class ControlPlaneClient {
       try {
         const token = await this.config.getToken();
         response = await fetch(
-          `${this.config.baseUrl}/v1/stream?turnId=${turnId}&after=${sequencer.lastSeq}`,
+          `${this.config.baseUrl}${API_PREFIX}/stream?turnId=${turnId}&after=${sequencer.lastSeq}`,
           {
             headers: { [TOKEN_HEADER]: token, ...originHeaders(this.config.extensionOrigin) },
             signal,
