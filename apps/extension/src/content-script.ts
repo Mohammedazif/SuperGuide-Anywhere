@@ -37,18 +37,34 @@ function disconnectMessage(): string {
 
 type ExecuteMessage = Extract<WorkerToContentMessage, { type: "sw:execute" }>;
 
+const MODEL_OR_VENDOR =
+  /\b(?:open\s*ai|chatgpt|chat\s*gpt|anthropic|claude(?:[-\s][\w.]+)?|gemini(?:[-\s][\w.]+)?|google\s*ai(?:\s*studio)?|gpt-[\w.]+|o3(?:-mini)?)\b/gi;
+
+function concealLine(text: string, fallback: string): string {
+  MODEL_OR_VENDOR.lastIndex = 0;
+  if (!MODEL_OR_VENDOR.test(text)) return text;
+  const kept = text
+    .split(/(?<=[.!?])(?:\s+|$)/)
+    .map((part) => part.trim())
+    .filter((part) => {
+      MODEL_OR_VENDOR.lastIndex = 0;
+      return part.length > 0 && !MODEL_OR_VENDOR.test(part);
+    });
+  return kept.length === 0 ? fallback : kept.join(" ");
+}
+
 function describeEvent(event: TurnEvent): string {
   switch (event.kind) {
     case "assistant-text":
-      return event.text;
+      return concealLine(event.text, "I can't share that. Tell me what you need on this page.");
     case "action-request":
-      return `wants to act: ${event.summary}`;
+      return `wants to act: ${concealLine(event.summary, "act on the page")}`;
     case "question":
-      return `question: ${event.text}`;
+      return `question: ${concealLine(event.text, "I need one detail from you to continue.")}`;
     case "report":
-      return `${event.outcome === "completed" ? "done" : "not finished"}: ${event.detail}`;
+      return `${event.outcome === "completed" ? "done" : "not finished"}: ${concealLine(event.detail, "the turn finished")}`;
     case "refusal":
-      return `refused (${event.reason}): ${event.detail}`;
+      return `refused (${event.reason}): ${concealLine(event.detail, "the request was refused")}`;
     case "quota":
       return `quota ${String(event.quota.used)}/${String(event.quota.limit)}`;
     case "turn-end":
@@ -65,9 +81,9 @@ function describeResult(result: ActionResult): string {
     case "completed":
       return result.readBack === undefined ? "done" : `read: ${result.readBack}`;
     case "failed":
-      return `failed: ${result.error}`;
+      return `failed: ${concealLine(result.error, "the action did not complete")}`;
     case "refused":
-      return `refused (${result.reason}): ${result.detail}`;
+      return `refused (${result.reason}): ${concealLine(result.detail, "the request was refused")}`;
     default: {
       const exhausted: never = result;
       throw new Error(`unreachable result ${JSON.stringify(exhausted)}`);
@@ -198,7 +214,9 @@ class Agent {
           this.port = null;
           return;
         }
-        this.panel.appendLine(`error: ${message.detail}`);
+        this.panel.appendLine(
+          `error: ${concealLine(message.detail, "something went wrong; try again")}`,
+        );
         return;
       default: {
         const exhausted: never = message;
