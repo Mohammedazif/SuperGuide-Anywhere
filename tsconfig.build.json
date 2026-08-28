@@ -9,8 +9,6 @@
     { "path": "packages/transport" },
     { "path": "packages/ui" },
     { "path": "apps/extension" },
-    { "path": "apps/control-plane" },
-    { "path": "apps/fixture-app" },
-    { "path": "eval/harness" }
+    { "path": "apps/fixture-app" }
   ]
 }

@@ -274,37 +274,8 @@ export default tseslint.config(
     "the extension bundle must never reach @sga/contract/internal.",
   ),
 
-  boundary(
-    ["apps/control-plane/**/*.ts"],
-    [
-      INTERNAL_PACKAGES.contractPublic,
-      INTERNAL_PACKAGES.contractInternal,
-      INTERNAL_PACKAGES.policy,
-      INTERNAL_PACKAGES.adapters,
-    ],
-    "control-plane may import only contract, policy, and adapters. Browser packages are out of bounds.",
-  ),
-
-  boundary(
-    ["eval/harness/**/*.ts"],
-    [
-      INTERNAL_PACKAGES.contractPublic,
-      INTERNAL_PACKAGES.contractInternal,
-      INTERNAL_PACKAGES.policy,
-      INTERNAL_PACKAGES.adapters,
-      INTERNAL_PACKAGES.observer,
-      INTERNAL_PACKAGES.executor,
-    ],
-    "the eval harness may not import the extension surface or its transport.",
-  ),
-
   {
-    files: ["eval/harness/**/*.ts"],
-    rules: { "no-console": "off", "no-restricted-properties": "off" },
-  },
-
-  {
-    files: ["apps/control-plane/src/env.ts", "apps/fixture-app/src/env.ts"],
+    files: ["apps/fixture-app/src/env.ts"],
     rules: { "no-restricted-properties": "off" },
   },
 

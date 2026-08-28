@@ -1,17 +1,5 @@
 import { defineConfig } from "vitest/config";
 
-const databaseProject = (name: string, include: string[]) => ({
-  test: {
-    name,
-    include,
-    environment: "node" as const,
-    globalSetup: ["./tests/helpers/global-setup.ts"],
-    hookTimeout: 60_000,
-    testTimeout: 60_000,
-    fileParallelism: false,
-  },
-});
-
 export default defineConfig({
   test: {
     passWithNoTests: true,
@@ -23,8 +11,6 @@ export default defineConfig({
           environment: "node",
         },
       },
-      databaseProject("integration", ["tests/integration/**/*.test.ts"]),
-      databaseProject("security", ["tests/security/**/*.test.ts"]),
     ],
     coverage: {
       provider: "v8",
