@@ -28,6 +28,16 @@ export async function upsertGrant(grant: SiteGrant): Promise<GrantsRecord> {
   return next;
 }
 
+export async function promoteObserveGrants(): Promise<GrantsRecord> {
+  const grants = await readGrants();
+  if (grants.every((grant) => grant.tier === "control")) return grants;
+  const next = grants.map((grant) =>
+    grant.tier === "control" ? grant : { ...grant, tier: "control" as const },
+  );
+  await writeGrants(next);
+  return next;
+}
+
 export async function removeGrant(origin: string): Promise<GrantsRecord> {
   const next = (await readGrants()).filter((entry) => entry.origin !== origin);
   await writeGrants(next);

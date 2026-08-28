@@ -7,8 +7,6 @@ export type ActivityState = "idle" | "running" | "paused";
 
 export interface PanelCallbacks {
   onTask(text: string): void;
-  onPause(): void;
-  onResume(): void;
   onStop(): void;
 }
 
@@ -18,7 +16,9 @@ export interface PanelHandle {
   setActivity(state: ActivityState): void;
   setQuota(quota: Quota | null): void;
   appendLine(text: string): void;
-  showConfirmation(decide: (approved: boolean) => void): void;
+  setThinking(text: string | null): void;
+  recordStep(label: string, ok: boolean): void;
+  showConfirmation(decide: (approved: boolean) => void, summary?: string): void;
   highlightTarget(element: Element): Promise<void>;
   open(): void;
   remove(): void;
@@ -45,6 +45,11 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
   let activity: ActivityState = "idle";
   let decisionBar: HTMLDivElement | null = null;
   let panelOpen = false;
+  let thinking: HTMLDivElement | null = null;
+  let stepsFold: HTMLDetailsElement | null = null;
+  let stepsList: HTMLUListElement | null = null;
+  let completedCount = 0;
+  let failedCount = 0;
 
   const badge = doc.createElement("button");
   badge.textContent = "SG";
@@ -76,17 +81,7 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
 
   const quotaText = doc.createElement("span");
   quotaText.style.cssText = "font:11px/1 system-ui,sans-serif;white-space:nowrap";
-
-  const pause = doc.createElement("button");
-  pause.textContent = "Pause";
-  const stop = doc.createElement("button");
-  stop.textContent = "Stop";
-  for (const button of [pause, stop]) {
-    button.style.cssText =
-      "height:28px;padding:0 10px;border-radius:8px;border:1px solid;cursor:pointer;" +
-      "font:600 11px/28px system-ui,sans-serif";
-  }
-  header.append(titleWrap, quotaText, pause, stop);
+  header.append(titleWrap, quotaText);
 
   const log = doc.createElement("div");
   log.style.cssText =
@@ -144,11 +139,17 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
       title,
       status,
       quotaText,
-      controls: [stop, pause],
+      controls: [],
       decisionBar,
       emptyHint: emptyHint.isConnected ? emptyHint : null,
     });
     act.paint(host.dataset.sgaTheme === "dark" ? "dark" : "light");
+    const muted = host.dataset.sgaTheme === "dark" ? "#9a9aa8" : "#6b7280";
+    if (thinking !== null) thinking.style.color = muted;
+    if (stepsFold !== null) {
+      const summary = stepsFold.querySelector("summary");
+      if (summary instanceof HTMLElement) summary.style.color = muted;
+    }
     if (activity === "running") status.style.color = "#3f9d63";
     else if (activity === "paused") status.style.color = "#c98a1b";
   };
@@ -162,7 +163,6 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
         : activity === "running"
           ? `${TIER_TITLE[tier]} (working)`
           : TIER_TITLE[tier];
-    pause.textContent = activity === "paused" ? "Resume" : "Pause";
     status.textContent =
       activity === "paused" ? "Paused" : activity === "running" ? "Working" : "Ready";
     if (activity === "running") status.style.color = "#3f9d63";
@@ -192,13 +192,19 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
   badge.addEventListener("click", () => {
     setPanelOpen(!panelOpen);
   });
-  stop.addEventListener("click", () => {
-    callbacks.onStop();
-  });
-  pause.addEventListener("click", () => {
-    if (activity === "paused") callbacks.onResume();
-    else callbacks.onPause();
-  });
+
+  const placeBeforeTail = (node: HTMLElement): void => {
+    if (thinking !== null) log.insertBefore(node, thinking);
+    else log.append(node);
+  };
+
+  const beginTask = (): void => {
+    setThinking(null);
+    stepsFold = null;
+    stepsList = null;
+    completedCount = 0;
+    failedCount = 0;
+  };
 
   const appendLine = (text: string): void => {
     if (activity === "running") setPanelOpen(true);
@@ -209,9 +215,14 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
         : text.startsWith("error:")
           ? "error"
           : "agent";
+    if (kind === "user") beginTask();
     const bubble = doc.createElement("div");
     bubble.dataset.kind = kind;
-    bubble.textContent = text.startsWith("you: ") ? text.slice(5) : text;
+    bubble.textContent = text.startsWith("you: ")
+      ? text.slice(5)
+      : text.startsWith("error:")
+        ? text.slice("error:".length).trim()
+        : text;
     bubble.style.cssText =
       "max-width:86%;padding:8px 11px;border-radius:14px;white-space:pre-wrap;word-break:break-word;" +
       "font:13px/1.45 system-ui,sans-serif";
@@ -224,7 +235,56 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
     }
     const scheme = host.dataset.sgaTheme === "dark" ? "dark" : "light";
     paintBubble(bubble, THEMES[scheme]);
-    log.append(bubble);
+    placeBeforeTail(bubble);
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const setThinking = (text: string | null): void => {
+    if (text === null || text.length === 0) {
+      thinking?.remove();
+      thinking = null;
+      return;
+    }
+    if (emptyHint.isConnected) emptyHint.remove();
+    if (thinking === null) {
+      thinking = doc.createElement("div");
+      thinking.style.cssText =
+        "align-self:flex-start;font:12px/1.45 system-ui,sans-serif;font-style:italic";
+      log.append(thinking);
+    }
+    thinking.textContent = text;
+    paintChrome();
+    log.scrollTop = log.scrollHeight;
+  };
+
+  const stepsSummaryText = (): string => {
+    if (failedCount === 0) return `${String(completedCount)} completed`;
+    if (completedCount === 0) return `${String(failedCount)} failed`;
+    return `${String(completedCount)} completed, ${String(failedCount)} failed`;
+  };
+
+  const recordStep = (label: string, ok: boolean): void => {
+    if (emptyHint.isConnected) emptyHint.remove();
+    if (ok) completedCount += 1;
+    else failedCount += 1;
+    if (stepsFold === null || stepsList === null) {
+      stepsFold = doc.createElement("details");
+      stepsFold.style.cssText = "align-self:stretch;font:12px/1.45 system-ui,sans-serif";
+      const summary = doc.createElement("summary");
+      summary.style.cssText = "cursor:pointer;user-select:none";
+      stepsFold.append(summary);
+      stepsList = doc.createElement("ul");
+      stepsList.style.cssText = "margin:6px 0 0;padding-left:18px";
+      stepsFold.append(stepsList);
+      if (thinking !== null) log.insertBefore(stepsFold, thinking);
+      else log.append(stepsFold);
+    }
+    const item = doc.createElement("li");
+    item.textContent = ok ? label : `${label} (failed)`;
+    stepsList.append(item);
+    const summary = stepsFold.querySelector("summary");
+    if (summary !== null) summary.textContent = stepsSummaryText();
+    paintChrome();
     log.scrollTop = log.scrollHeight;
   };
 
@@ -261,13 +321,24 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
         quota === null ? "" : `${String(quota.used)} of ${String(quota.limit)} today`;
     },
     appendLine,
+    setThinking,
+    recordStep,
     highlightTarget: (element) => act.highlight(element),
-    showConfirmation: (decide) => {
+    showConfirmation: (decide, _summary) => {
       setPanelOpen(true);
       promoteHost(host, false);
+      setThinking(null);
+      decisionBar?.remove();
       const bar = doc.createElement("div");
       decisionBar = bar;
-      bar.style.cssText = "display:flex;gap:8px;flex-shrink:0;padding:8px 12px";
+      bar.style.cssText =
+        "display:flex;flex-direction:column;gap:8px;flex-shrink:0;padding:8px 12px";
+      const preview = doc.createElement("div");
+      preview.textContent = "SuperGuide wants approval to take action.";
+      preview.style.cssText = "font:650 13px/1.4 system-ui,sans-serif";
+      bar.append(preview);
+      const actions = doc.createElement("div");
+      actions.style.cssText = "display:flex;gap:8px";
       const approve = doc.createElement("button");
       approve.textContent = "Approve";
       const decline = doc.createElement("button");
@@ -280,7 +351,6 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
       const settle = (approved: boolean): void => {
         bar.remove();
         if (decisionBar === bar) decisionBar = null;
-        appendLine(approved ? "you approved" : "you declined");
         decide(approved);
       };
       approve.addEventListener("click", () => {
@@ -289,7 +359,8 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
       decline.addEventListener("click", () => {
         settle(false);
       });
-      bar.append(approve, decline);
+      actions.append(approve, decline);
+      bar.append(actions);
       paintChrome();
       panel.insertBefore(bar, composer);
     },

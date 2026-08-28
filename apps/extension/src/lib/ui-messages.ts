@@ -10,6 +10,11 @@ import {
 export const uiToWorkerMessageSchema = z.discriminatedUnion("type", [
   z.strictObject({ type: z.literal("ui:status"), origin: originSchema }),
   z.strictObject({
+    type: z.literal("ui:begin-activate"),
+    origin: originSchema,
+    tabId: z.number().int().min(0).nullable(),
+  }),
+  z.strictObject({
     type: z.literal("ui:activated"),
     origin: originSchema,
     tabId: z.number().int().min(0).nullable(),
@@ -33,6 +38,7 @@ export const workerReplySchema = z.discriminatedUnion("type", [
   }),
   z.strictObject({ type: z.literal("reply:quota"), quota: quotaSchema }),
   z.strictObject({ type: z.literal("reply:ok") }),
+  z.strictObject({ type: z.literal("reply:needs-permission") }),
   z.strictObject({ type: z.literal("reply:error"), detail: z.string() }),
 ]);
 export type WorkerReply = z.infer<typeof workerReplySchema>;

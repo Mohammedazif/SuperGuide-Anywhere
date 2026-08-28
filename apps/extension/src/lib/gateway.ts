@@ -11,13 +11,14 @@ import { createApiClient } from "./api";
 import {
   ensureDeviceId,
   grantFor,
+  promoteObserveGrants,
   readGlobalOff,
   readGrants,
   removeGrant,
   upsertGrant,
   writeGlobalOff,
 } from "./storage";
-import { originPattern, syncContentScripts } from "./registration";
+import { originFromPattern, originPattern, syncContentScripts } from "./registration";
 import { TurnSessionManager } from "./session";
 import { uiToWorkerMessageSchema, type UiToWorkerMessage, type WorkerReply } from "./ui-messages";
 
@@ -27,7 +28,16 @@ interface PortContext {
   tier: GrantTier;
 }
 
+const PENDING_ACTIVATE_KEY = "sga.pendingActivate";
+
+interface PendingActivate {
+  origin: string;
+  tabId: number | null;
+  pattern: string;
+}
+
 export class AgentGateway {
+  private readonly pendingActivate = new Map<string, PendingActivate>();
   private readonly ports = new Map<number, chrome.runtime.Port>();
   // Park outbound messages while the tab is navigating; flush on the next cs:hello.
   private readonly parked = new Map<number, WorkerToContentMessage[]>();
@@ -65,6 +75,10 @@ export class AgentGateway {
     chrome.permissions.onRemoved.addListener(() => {
       void this.reconcile();
     });
+    chrome.permissions.onAdded.addListener((delta) => {
+      void this.finishAddedOrigins(delta.origins ?? []);
+    });
+    void this.restorePending();
     void this.sessions.resumeAll();
   }
 
@@ -94,6 +108,101 @@ export class AgentGateway {
     await syncContentScripts(held);
     void refreshAdapterCache();
     await this.sessions.resumeAll();
+  }
+
+  private async restorePending(): Promise<void> {
+    const stored = await chrome.storage.session.get(PENDING_ACTIVATE_KEY);
+    const persisted = Array.isArray(stored[PENDING_ACTIVATE_KEY])
+      ? (stored[PENDING_ACTIVATE_KEY] as PendingActivate[])
+      : [];
+    for (const entry of persisted) this.pendingActivate.set(entry.pattern, entry);
+  }
+
+  private rememberPending(origin: string, tabId: number | null): void {
+    const pattern = originPattern(origin);
+    const entry = { origin, tabId, pattern };
+    this.pendingActivate.set(pattern, entry);
+    void chrome.storage.session.get(PENDING_ACTIVATE_KEY).then((stored) => {
+      const current = Array.isArray(stored[PENDING_ACTIVATE_KEY])
+        ? (stored[PENDING_ACTIVATE_KEY] as PendingActivate[])
+        : [];
+      const next = [...current.filter((item) => item.pattern !== pattern), entry];
+      return chrome.storage.session.set({ [PENDING_ACTIVATE_KEY]: next });
+    });
+  }
+
+  private takePending(pattern: string): PendingActivate | null {
+    const memory = this.pendingActivate.get(pattern) ?? null;
+    this.pendingActivate.delete(pattern);
+    void chrome.storage.session.get(PENDING_ACTIVATE_KEY).then((stored) => {
+      const current = Array.isArray(stored[PENDING_ACTIVATE_KEY])
+        ? (stored[PENDING_ACTIVATE_KEY] as PendingActivate[])
+        : [];
+      return chrome.storage.session.set({
+        [PENDING_ACTIVATE_KEY]: current.filter((item) => item.pattern !== pattern),
+      });
+    });
+    return memory;
+  }
+
+  private async inject(tabId: number): Promise<void> {
+    try {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["content-script.js"],
+      });
+    } catch {
+      return;
+    }
+  }
+
+  private async completeActivation(
+    origin: string,
+    tabId: number | null,
+  ): Promise<Extract<WorkerReply, { type: "reply:ok" | "reply:error" }>> {
+    const pattern = originPattern(origin);
+    const held = await chrome.permissions.contains({ origins: [pattern] });
+    if (!held) {
+      return { type: "reply:error", detail: `permission for ${pattern} is not held` };
+    }
+    this.takePending(pattern);
+    const existing = await grantFor(origin);
+    const grants = await upsertGrant({
+      origin,
+      tier: "control",
+      grantedAt: existing?.grantedAt ?? Date.now(),
+    });
+    await syncContentScripts(grants);
+    if (tabId !== null) await this.inject(tabId);
+    return { type: "reply:ok" };
+  }
+
+  private async beginActivate(origin: string, tabId: number | null): Promise<WorkerReply> {
+    const pattern = originPattern(origin);
+    this.rememberPending(origin, tabId);
+    try {
+      const granted = await chrome.permissions.request({ origins: [pattern] });
+      if (!granted) {
+        this.takePending(pattern);
+        return { type: "reply:error", detail: "permission was not granted" };
+      }
+      return await this.completeActivation(origin, tabId);
+    } catch {
+      return { type: "reply:needs-permission" };
+    }
+  }
+
+  private async finishAddedOrigins(patterns: string[]): Promise<void> {
+    const stored = await chrome.storage.session.get(PENDING_ACTIVATE_KEY);
+    const persisted = Array.isArray(stored[PENDING_ACTIVATE_KEY])
+      ? (stored[PENDING_ACTIVATE_KEY] as PendingActivate[])
+      : [];
+    for (const pattern of patterns) {
+      const pending = this.pendingActivate.get(pattern) ?? persisted.find((entry) => entry.pattern === pattern);
+      const origin = pending?.origin ?? originFromPattern(pattern);
+      if (origin === null) continue;
+      await this.completeActivation(origin, pending?.tabId ?? null);
+    }
   }
 
   private teardownOrigin(origin: string): void {
@@ -261,12 +370,17 @@ export class AgentGateway {
 
   private async dispatchUiMessage(message: UiToWorkerMessage): Promise<WorkerReply> {
     switch (message.type) {
-      case "ui:status":
-        return { type: "reply:status", grant: await grantFor(message.origin) };
+      case "ui:status": {
+        const grants = await promoteObserveGrants();
+        return {
+          type: "reply:status",
+          grant: grants.find((grant) => grant.origin === message.origin) ?? null,
+        };
+      }
       case "ui:list-grants":
         return {
           type: "reply:grants",
-          grants: await readGrants(),
+          grants: await promoteObserveGrants(),
           globalOff: await readGlobalOff(),
           deviceId: await ensureDeviceId(),
         };
@@ -291,25 +405,10 @@ export class AgentGateway {
         await chrome.storage.local.remove(STORAGE_KEYS.deviceId);
         return { type: "reply:ok" };
       }
-      case "ui:activated": {
-        const pattern = originPattern(message.origin);
-        const held = await chrome.permissions.contains({ origins: [pattern] });
-        if (!held) {
-          return { type: "reply:error", detail: `permission for ${pattern} is not held` };
-        }
-        const existing = await grantFor(message.origin);
-        const grants = await upsertGrant(
-          existing ?? { origin: message.origin, tier: "observe", grantedAt: Date.now() },
-        );
-        await syncContentScripts(grants);
-        if (message.tabId !== null) {
-          await chrome.scripting.executeScript({
-            target: { tabId: message.tabId },
-            files: ["content-script.js"],
-          });
-        }
-        return { type: "reply:ok" };
-      }
+      case "ui:begin-activate":
+        return this.beginActivate(message.origin, message.tabId);
+      case "ui:activated":
+        return this.completeActivation(message.origin, message.tabId);
       case "ui:set-tier": {
         const grant = await grantFor(message.origin);
         if (grant === null) {

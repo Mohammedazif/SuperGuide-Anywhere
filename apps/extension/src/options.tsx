@@ -8,7 +8,6 @@ function Options(): JSX.Element {
   const [grants, setGrants] = useState<GrantsRecord>([]);
   const [globalOff, setGlobalOff] = useState(false);
   const [deviceId, setDeviceId] = useState("");
-  const [armedControl, setArmedControl] = useState<string | null>(null);
   const [armedErase, setArmedErase] = useState(false);
   const [eraseNote, setEraseNote] = useState<string | null>(null);
 
@@ -25,9 +24,8 @@ function Options(): JSX.Element {
     void refresh();
   }, [refresh]);
 
-  const setTier = (origin: string, tier: "observe" | "control"): void => {
-    setArmedControl(null);
-    void requestWorker({ type: "ui:set-tier", origin, tier }).then(refresh);
+  const enableActing = (origin: string): void => {
+    void requestWorker({ type: "ui:set-tier", origin, tier: "control" }).then(refresh);
   };
 
   const deactivate = (origin: string): void => {
@@ -70,32 +68,14 @@ function Options(): JSX.Element {
                 <td>{grant.tier === "control" ? "observe + act" : "observe only"}</td>
                 <td>
                   {grant.tier === "observe" ? (
-                    armedControl === grant.origin ? (
-                      <button
-                        onClick={() => {
-                          setTier(grant.origin, "control");
-                        }}
-                      >
-                        Confirm control
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => {
-                          setArmedControl(grant.origin);
-                        }}
-                      >
-                        Enable control…
-                      </button>
-                    )
-                  ) : (
                     <button
                       onClick={() => {
-                        setTier(grant.origin, "observe");
+                        enableActing(grant.origin);
                       }}
                     >
-                      Drop to observe
+                      Enable acting
                     </button>
-                  )}
+                  ) : null}
                 </td>
                 <td>
                   <button

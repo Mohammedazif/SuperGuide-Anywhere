@@ -4,8 +4,6 @@ import { createPanel, type PanelCallbacks } from "./panel";
 
 const callbacks: PanelCallbacks = {
   onTask: () => undefined,
-  onPause: () => undefined,
-  onResume: () => undefined,
   onStop: () => undefined,
 };
 
@@ -117,9 +115,12 @@ describe("the overlay panel", () => {
     const panel = createPanel(document, "sga-root", callbacks);
     panel.setTier("control");
     panel.setActivity("running");
-    panel.appendLine("wants to act: click");
+    panel.appendLine("you: change theme");
+    panel.setThinking("Working on this page");
+    panel.recordStep("Clicked Settings", true);
+    panel.appendLine("you: connect slack");
+    panel.recordStep("Clicked Slack", true);
     panel.setActivity("running");
-    panel.appendLine("done");
     panel.remove();
   });
 

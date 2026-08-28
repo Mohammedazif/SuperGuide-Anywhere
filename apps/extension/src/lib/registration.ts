@@ -8,6 +8,18 @@ export function originPattern(origin: string): string {
   return `${url.protocol}//${url.hostname}/*`;
 }
 
+export function originFromPattern(pattern: string): string | null {
+  if (!pattern.endsWith("/*")) return null;
+  try {
+    const url = new URL(pattern.slice(0, -2));
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.hostname.includes("*")) return null;
+    return url.origin;
+  } catch {
+    return null;
+  }
+}
+
 function scriptId(origin: string): string {
   return `${SCRIPT_ID_PREFIX}${origin.replaceAll(/[^a-z0-9]/gi, "-")}`;
 }

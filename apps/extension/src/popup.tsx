@@ -35,7 +35,6 @@ function Popup(): JSX.Element {
   const [grant, setGrant] = useState<SiteGrant | null>(null);
   const [quota, setQuota] = useState<Quota | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [armedControl, setArmedControl] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -81,6 +80,14 @@ function Popup(): JSX.Element {
 
   const activate = (): void => {
     act(async () => {
+      const begun = await requestWorker({
+        type: "ui:begin-activate",
+        origin: target.origin,
+        tabId: target.tabId,
+      });
+      if (begun.type === "reply:ok") return;
+      if (begun.type === "reply:error") throw new Error(begun.detail);
+      if (begun.type !== "reply:needs-permission") return;
       const granted = await chrome.permissions.request({
         origins: [originPattern(target.origin)],
       });
@@ -89,10 +96,9 @@ function Popup(): JSX.Element {
     });
   };
 
-  const setTier = (tier: "observe" | "control"): void => {
-    setArmedControl(false);
+  const enableActing = (): void => {
     act(async () => {
-      await requestWorker({ type: "ui:set-tier", origin: target.origin, tier });
+      await requestWorker({ type: "ui:set-tier", origin: target.origin, tier: "control" });
     });
   };
 
@@ -109,11 +115,11 @@ function Popup(): JSX.Element {
       {grant === null ? (
         <div>
           <button class="primary" data-testid="activate" onClick={activate}>
-            Activate on this site (observe only)
+            Activate on this site
           </button>
           <p class="note">
-            The agent will be able to read this site and explain what to do. It will not be able to
-            click, type, or change anything unless you enable control separately.
+            Chrome will ask to allow this site. After you click Allow, SuperGuide can read and act on
+            this page.
           </p>
         </div>
       ) : (
@@ -122,41 +128,15 @@ function Popup(): JSX.Element {
             {grant.tier === "control" ? "Can observe and act" : "Observing only"}
           </div>
           {grant.tier === "observe" ? (
-            armedControl ? (
-              <button
-                class="primary"
-                data-testid="confirm-control"
-                onClick={() => {
-                  setTier("control");
-                }}
-              >
-                Confirm: allow acting on this site
-              </button>
-            ) : (
-              <button
-                data-testid="enable-control"
-                onClick={() => {
-                  setArmedControl(true);
-                }}
-              >
-                Enable control…
-              </button>
-            )
-          ) : (
             <button
-              data-testid="drop-observe"
+              class="primary"
+              data-testid="enable-control"
               onClick={() => {
-                setTier("observe");
+                enableActing();
               }}
             >
-              Drop to observe only
+              Enable acting on this site
             </button>
-          )}
-          {armedControl ? (
-            <p class="note">
-              With control enabled the agent can click, type, and navigate on this site. Risky
-              actions still ask you first. Confirm above to proceed.
-            </p>
           ) : null}
           <button class="danger" data-testid="deactivate" onClick={deactivate}>
             Deactivate this site

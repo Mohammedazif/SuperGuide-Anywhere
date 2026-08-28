@@ -2,6 +2,8 @@ import {
   PORT_NAME,
   workerToContentMessageSchema,
   type ActionResult,
+  type AgentAction,
+  type ExpectPredicate,
   type GrantTier,
   type PageDigest,
   type TurnEvent,
@@ -53,22 +55,20 @@ function concealLine(text: string, fallback: string): string {
   return kept.length === 0 ? fallback : kept.join(" ");
 }
 
-function describeEvent(event: TurnEvent): string {
+function describeEvent(event: TurnEvent): string | null {
   switch (event.kind) {
     case "assistant-text":
       return concealLine(event.text, "I can't share that. Tell me what you need on this page.");
-    case "action-request":
-      return `wants to act: ${concealLine(event.summary, "act on the page")}`;
     case "question":
-      return `question: ${concealLine(event.text, "I need one detail from you to continue.")}`;
+      return concealLine(event.text, "I need one detail from you to continue.");
     case "report":
-      return `${event.outcome === "completed" ? "done" : "not finished"}: ${concealLine(event.detail, "the turn finished")}`;
+      return concealLine(event.detail, "the turn finished");
     case "refusal":
-      return `refused (${event.reason}): ${concealLine(event.detail, "the request was refused")}`;
+      return "error: SuperGuide could not continue.";
+    case "action-request":
     case "quota":
-      return `quota ${String(event.quota.used)}/${String(event.quota.limit)}`;
     case "turn-end":
-      return `turn ended: ${event.status}`;
+      return null;
     default: {
       const exhausted: never = event;
       throw new Error(`unreachable event ${JSON.stringify(exhausted)}`);
@@ -76,19 +76,89 @@ function describeEvent(event: TurnEvent): string {
   }
 }
 
-function describeResult(result: ActionResult): string {
-  switch (result.status) {
-    case "completed":
-      return result.readBack === undefined ? "done" : `read: ${result.readBack}`;
-    case "failed":
-      return `failed: ${concealLine(result.error, "the action did not complete")}`;
-    case "refused":
-      return `refused (${result.reason}): ${concealLine(result.detail, "the request was refused")}`;
+function nodeName(digest: PageDigest, id: string): string | null {
+  const name = digest.nodes.find((node) => node.id === id)?.name.trim();
+  return name !== undefined && name.length > 0 ? name : null;
+}
+
+function waitLabel(predicate: ExpectPredicate): string {
+  switch (predicate.kind) {
+    case "element-present":
+      return `Waited for ${predicate.target.name}`;
+    case "element-absent":
+      return `Waited for ${predicate.target.name} to close`;
+    case "text-matches":
+      return predicate.target === null
+        ? "Waited for the page to update"
+        : `Waited for ${predicate.target.name} to update`;
+    case "url-matches":
+      return "Waited for the page to open";
+    case "value-equals":
+      return `Waited for ${predicate.target.name}`;
+    case "state-is":
+      return `Waited for ${predicate.target.name}`;
     default: {
-      const exhausted: never = result;
-      throw new Error(`unreachable result ${JSON.stringify(exhausted)}`);
+      const exhausted: never = predicate;
+      throw new Error(`unreachable predicate ${JSON.stringify(exhausted)}`);
     }
   }
+}
+
+function stepLabel(action: AgentAction, digest: PageDigest): string {
+  const named = (id: string): string | null => nodeName(digest, id);
+  switch (action.kind) {
+    case "click": {
+      const name = named(action.target.id);
+      return name !== null ? `Clicked ${name}` : "Clicked";
+    }
+    case "type": {
+      const name = named(action.target.id);
+      return name !== null ? `Typed in ${name}` : "Typed";
+    }
+    case "select":
+      return `Selected ${action.optionLabel}`;
+    case "check": {
+      const name = named(action.target.id);
+      const verb = action.checked ? "Checked" : "Unchecked";
+      return name !== null ? `${verb} ${name}` : verb;
+    }
+    case "focus": {
+      const name = named(action.target.id);
+      return name !== null ? `Focused ${name}` : "Focused";
+    }
+    case "scrollIntoView": {
+      const name = named(action.target.id);
+      return name !== null ? `Scrolled to ${name}` : "Scrolled into view";
+    }
+    case "navigate": {
+      const leaf = action.path.split("/").filter((part) => part.length > 0).pop();
+      return leaf !== undefined ? `Opened ${leaf.replaceAll(/[-_]/g, " ")}` : "Opened a page";
+    }
+    case "waitFor":
+      return waitLabel(action.predicate);
+    case "readBack": {
+      const name = named(action.target.id);
+      return name !== null ? `Read ${name}` : "Checked the page";
+    }
+    default: {
+      const exhausted: never = action;
+      throw new Error(`unreachable action ${JSON.stringify(exhausted)}`);
+    }
+  }
+}
+
+function failedStepLabel(action: AgentAction, digest: PageDigest, result: ActionResult): string {
+  if (action.kind === "waitFor") {
+    if (action.predicate.kind === "element-present") {
+      return `Could not find ${action.predicate.target.name} in time`;
+    }
+    return "The page did not update in time";
+  }
+  if (result.status === "refused") {
+    return "That step was not allowed";
+  }
+  const done = stepLabel(action, digest);
+  return `${done} did not complete`;
 }
 
 function captureDigest(): PageDigest {
@@ -103,16 +173,11 @@ class Agent {
     onTask: (taskText) => {
       this.post({ type: "cs:task", taskText, digest: captureDigest() });
     },
-    onPause: () => {
-      this.post({ type: "cs:pause" });
-    },
-    onResume: () => {
-      this.post({ type: "cs:resume" });
-    },
     onStop: () => {
       this.post({ type: "cs:stop" });
       this.panel.setActivity("idle");
-      this.panel.appendLine("stopped");
+      this.panel.setThinking(null);
+      this.panel.appendLine("Stopped.");
     },
   });
 
@@ -180,14 +245,16 @@ class Agent {
         if (message.paused) this.panel.setActivity("paused");
         return;
       case "sw:event": {
-        this.panel.appendLine(describeEvent(message.event));
         const event = message.event;
         if (event.kind === "action-request") {
           this.panel.setActivity("running");
           this.panel.open();
         }
         if (event.kind === "quota") this.panel.setQuota(event.quota);
-        if (event.kind === "turn-end") this.panel.setActivity("idle");
+        if (event.kind === "turn-end") {
+          this.panel.setActivity("idle");
+          this.panel.setThinking(null);
+        }
         if (event.kind === "action-request" && event.needsConfirmation) {
           this.panel.showConfirmation((approved) => {
             this.post({
@@ -197,13 +264,25 @@ class Agent {
               paramsHash: event.paramsHash,
               approved,
             });
+            if (approved) this.panel.setThinking("Working on this page");
           });
+          return;
+        }
+        if (event.kind === "action-request") {
+          this.panel.setThinking("Working on this page");
+          return;
+        }
+        const line = describeEvent(event);
+        if (line !== null) {
+          this.panel.setThinking(null);
+          this.panel.appendLine(line);
         }
         return;
       }
       case "sw:execute":
         this.panel.setActivity("running");
         this.panel.open();
+        this.panel.setThinking("Working on this page");
         void this.execute(message);
         return;
       case "sw:error":
@@ -214,9 +293,7 @@ class Agent {
           this.port = null;
           return;
         }
-        this.panel.appendLine(
-          `error: ${concealLine(message.detail, "something went wrong; try again")}`,
-        );
+        this.panel.appendLine("error: Something went wrong. Try again.");
         return;
       default: {
         const exhausted: never = message;
@@ -229,6 +306,7 @@ class Agent {
     // Stored grant at execute time outranks worker tier; mid-turn revoke/downgrade must refuse.
     const grant = await grantFor(location.origin);
     const tier: GrantTier = grant?.tier ?? "observe";
+    const before = observe(document);
     const result = await executeAction(message.action, tier, {
       document,
       observe: () => observe(document),
@@ -252,7 +330,16 @@ class Agent {
       result,
       digest,
     });
-    this.panel.appendLine(describeResult(result));
+    const ok = result.status === "completed";
+    this.panel.recordStep(
+      ok ? stepLabel(message.action, before.digest) : failedStepLabel(message.action, before.digest, result),
+      ok,
+    );
+    if (ok) {
+      this.panel.setThinking("Working on this page");
+      return;
+    }
+    this.panel.setThinking(null);
   }
 }
 
