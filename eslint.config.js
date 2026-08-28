@@ -105,7 +105,6 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ["apps/*/tsup.config.ts"],
           defaultProject: "tsconfig.json",
         },
         tsconfigRootDir: import.meta.dirname,
@@ -275,7 +274,7 @@ export default tseslint.config(
   ),
 
   {
-    files: ["apps/fixture-app/src/env.ts"],
+    files: ["apps/fixture-app/src/env.ts", "apps/*/tsup.config.ts"],
     rules: { "no-restricted-properties": "off" },
   },
 
