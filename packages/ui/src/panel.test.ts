@@ -135,6 +135,62 @@ describe("the overlay panel", () => {
     panel.remove();
   });
 
+  it("does not leak composer keystrokes to the page", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    document.documentElement.append(panel.host);
+    panel.open();
+    let leaked = 0;
+    const onKey = (): void => {
+      leaked += 1;
+    };
+    document.addEventListener("keydown", onKey);
+    const event = new KeyboardEvent("keydown", {
+      key: "t",
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+    panel.host.dispatchEvent(event);
+    document.removeEventListener("keydown", onKey);
+    expect(leaked).toBe(0);
+    panel.remove();
+  });
+
+  it("lets the page receive keystrokes that did not come from the panel", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    document.documentElement.append(panel.host);
+    panel.open();
+    let leaked = 0;
+    const onKey = (): void => {
+      leaked += 1;
+    };
+    document.addEventListener("keydown", onKey);
+    const event = new KeyboardEvent("keydown", {
+      key: "t",
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+    document.body.dispatchEvent(event);
+    document.removeEventListener("keydown", onKey);
+    expect(leaked).toBe(1);
+    panel.remove();
+  });
+
+  it("looks like a text field so page shortcut guards skip the host", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    expect(panel.host.getAttribute("contenteditable")).toBe("true");
+    panel.remove();
+  });
+
+  it("focuses the composer when the panel opens", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    document.documentElement.append(panel.host);
+    panel.open();
+    expect(document.activeElement).toBe(panel.host);
+    panel.remove();
+  });
+
   it("stops watching the page after remove", async () => {
     const panel = createPanel(document, "sga-root", callbacks);
     panel.remove();

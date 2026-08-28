@@ -34,12 +34,35 @@ const ACTIVITY_RING: Record<ActivityState, string> = {
   running: "0 0 0 3px #3f9d63",
   paused: "0 0 0 3px #c98a1b",
 };
+const PAGE_KEYS = ["keydown", "keypress", "keyup", "paste", "beforeinput", "compositionstart"] as const;
+
+function stopPageShortcuts(event: Event): void {
+  event.stopPropagation();
+}
+
+function retainKeys(node: EventTarget): void {
+  for (const name of PAGE_KEYS) {
+    node.addEventListener(name, stopPageShortcuts);
+  }
+}
 
 export function createPanel(doc: Document, hostId: string, callbacks: PanelCallbacks): PanelHandle {
   const host = doc.createElement("div");
   host.id = hostId;
   styleHost(host);
+  // Closed shadow retargets keys to this host. GitHub (and others) skip shortcuts on contenteditable.
+  host.setAttribute("contenteditable", "true");
+  host.setAttribute("spellcheck", "false");
+  host.tabIndex = -1;
+  host.style.outline = "none";
+  host.style.caretColor = "transparent";
   const shadow = host.attachShadow({ mode: "closed" });
+  retainKeys(shadow);
+  retainKeys(host);
+  host.addEventListener("beforeinput", (event) => {
+    const origin = typeof event.composedPath === "function" ? event.composedPath()[0] : event.target;
+    if (origin === host) event.preventDefault();
+  });
 
   let tier: GrantTier = "observe";
   let activity: ActivityState = "idle";
@@ -114,9 +137,14 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
   panel.append(header, log, composer);
   shadow.append(badge, panel);
 
+  const focusComposer = (): void => {
+    if (typeof input.focus === "function") input.focus();
+  };
+
   const setPanelOpen = (open: boolean): void => {
     panelOpen = open;
     panel.style.display = open ? "flex" : "none";
+    if (open) focusComposer();
   };
 
   const act = createActLayer(doc, shadow, host, () => {
@@ -191,6 +219,16 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
 
   badge.addEventListener("click", () => {
     setPanelOpen(!panelOpen);
+  });
+  panel.addEventListener("pointerdown", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLButtonElement || target instanceof HTMLInputElement) return;
+    focusComposer();
+  });
+  host.addEventListener("focusin", () => {
+    if (!panelOpen) return;
+    const active = shadow.activeElement;
+    if (active === null || active === host) focusComposer();
   });
 
   const placeBeforeTail = (node: HTMLElement): void => {
@@ -297,6 +335,7 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
   };
 
   input.addEventListener("keydown", (keyEvent) => {
+    keyEvent.stopPropagation();
     if (keyEvent.key === "Enter") {
       keyEvent.preventDefault();
       submit();
