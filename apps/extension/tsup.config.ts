@@ -14,5 +14,8 @@ export default defineConfig({
   sourcemap: false,
   minify: false,
   target: "chrome120",
+  define: {
+    __SGA_API_BASE__: JSON.stringify(process.env.SGA_API_BASE ?? ""),
+  },
   onSuccess: "node ./copy-static.mjs",
 });

@@ -1,7 +1,13 @@
 import { ControlPlaneClient, registerDevice } from "@sga/transport";
 import { ensureDeviceId } from "./storage";
 
-const DEFAULT_API_BASE = "http://127.0.0.1:8080";
+declare const __SGA_API_BASE__: string;
+
+const BAKED_API_BASE = (typeof __SGA_API_BASE__ === "string" ? __SGA_API_BASE__ : "").replace(
+  /\/$/,
+  "",
+);
+const DEFAULT_API_BASE = BAKED_API_BASE.length > 0 ? BAKED_API_BASE : "http://127.0.0.1:8080";
 const API_BASE_KEY = "sga.apiBase";
 const TOKEN_KEY = "sga.deviceToken";
 

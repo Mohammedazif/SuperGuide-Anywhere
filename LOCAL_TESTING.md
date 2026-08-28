@@ -33,3 +33,11 @@ chrome.storage.local.set({ 'sga.apiBase': 'http://127.0.0.1:8080' })
 ```
 
 `apiBase` is the origin only. The client adds `/v1/anywhere` itself.
+
+Hosted API: bake the public origin into the bundle, then load unpacked as usual.
+
+```bash
+SGA_API_BASE=https://YOUR_SERVICE.onrender.com pnpm run build
+```
+
+`chrome.storage.local.set({ 'sga.apiBase': 'https://YOUR_SERVICE.onrender.com' })` still overrides the baked default. The backend allowlist is `chrome-extension://ghdcebndlanhmdeajdbbemcaihpenhoj` (from this repo's manifest `key`).
