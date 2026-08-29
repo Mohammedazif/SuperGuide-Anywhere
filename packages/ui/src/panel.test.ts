@@ -135,6 +135,34 @@ describe("the overlay panel", () => {
     panel.remove();
   });
 
+  it("does not leak pointer or focus events that would dismiss a host modal", () => {
+    const panel = createPanel(document, "sga-root", callbacks);
+    document.documentElement.append(panel.host);
+    panel.open();
+    let leaked = 0;
+    const count = (): void => {
+      leaked += 1;
+    };
+    document.addEventListener("pointerdown", count);
+    document.addEventListener("mousedown", count);
+    document.addEventListener("click", count);
+    document.addEventListener("focusin", count);
+    document.addEventListener("wheel", count);
+
+    for (const type of ["pointerdown", "mousedown", "click", "focusin", "wheel"] as const) {
+      panel.host.dispatchEvent(new Event(type, { bubbles: true, composed: true, cancelable: true }));
+    }
+
+    document.removeEventListener("pointerdown", count);
+    document.removeEventListener("mousedown", count);
+    document.removeEventListener("click", count);
+    document.removeEventListener("focusin", count);
+    document.removeEventListener("wheel", count);
+
+    expect(leaked).toBe(0);
+    panel.remove();
+  });
+
   it("does not leak composer keystrokes to the page", () => {
     const panel = createPanel(document, "sga-root", callbacks);
     document.documentElement.append(panel.host);

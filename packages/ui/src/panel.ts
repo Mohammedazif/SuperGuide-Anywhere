@@ -34,15 +34,35 @@ const ACTIVITY_RING: Record<ActivityState, string> = {
   running: "0 0 0 3px #3f9d63",
   paused: "0 0 0 3px #c98a1b",
 };
-const PAGE_KEYS = ["keydown", "keypress", "keyup", "paste", "beforeinput", "compositionstart"] as const;
+const PAGE_EVENTS = [
+  "keydown",
+  "keypress",
+  "keyup",
+  "paste",
+  "beforeinput",
+  "compositionstart",
+  "pointerdown",
+  "pointerup",
+  "mousedown",
+  "mouseup",
+  "click",
+  "dblclick",
+  "touchstart",
+  "touchend",
+  "contextmenu",
+  "focusin",
+  "focusout",
+  "wheel",
+  "touchmove",
+] as const;
 
-function stopPageShortcuts(event: Event): void {
+function stopPagePropagation(event: Event): void {
   event.stopPropagation();
 }
 
-function retainKeys(node: EventTarget): void {
-  for (const name of PAGE_KEYS) {
-    node.addEventListener(name, stopPageShortcuts);
+function isolateFromPage(node: EventTarget): void {
+  for (const name of PAGE_EVENTS) {
+    node.addEventListener(name, stopPagePropagation);
   }
 }
 
@@ -57,8 +77,8 @@ export function createPanel(doc: Document, hostId: string, callbacks: PanelCallb
   host.style.outline = "none";
   host.style.caretColor = "transparent";
   const shadow = host.attachShadow({ mode: "closed" });
-  retainKeys(shadow);
-  retainKeys(host);
+  isolateFromPage(shadow);
+  isolateFromPage(host);
   host.addEventListener("beforeinput", (event) => {
     const origin = typeof event.composedPath === "function" ? event.composedPath()[0] : event.target;
     if (origin === host) event.preventDefault();
