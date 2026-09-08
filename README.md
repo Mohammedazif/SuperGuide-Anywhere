@@ -10,7 +10,7 @@ and explain) and `control` (the agent can act, under confirmation rules). Entitl
 decided by the server and only by the server.
 
 This repository is the **Chrome extension**. The backend is SuperGuide's control plane
-(`/v1/anywhere`). See `LOCAL_TESTING.md`.
+(`/v1/anywhere`).
 
 ## Quickstart
 

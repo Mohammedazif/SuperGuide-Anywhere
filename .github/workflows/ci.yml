@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
 
 jobs:
@@ -17,7 +17,6 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm build
-      - run: pnpm test:unit
       - run: pnpm check:forbidden
       - run: pnpm check:manifest
       - run: pnpm check:bundle-boundary

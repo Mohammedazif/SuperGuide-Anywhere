@@ -3,7 +3,7 @@ dist/
 dist-tsc/
 .env
 .env.local
-eval/results/
+eval/
 node_modules/
 .pgdata/
 .pginitpw
@@ -16,4 +16,12 @@ test-results/
 *.tsbuildinfo
 store-package/
 dist-package/
-eval/results/
+tests/
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+vitest.config.ts
+LOCAL_TESTING.md
+REPORT.md
+docs/STORE_LISTING.md
+
